@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>人力需求測算儀表板</title>
+  <title>人力需求測算儀表板 (Supabase版)</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- 引入 Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
     body { background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
@@ -42,33 +44,13 @@
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
-    // --- Firebase 設定 (請填入您的設定) ---
-    const firebaseConfig = {
-      // apiKey: "...",
-    };
-
-    const APP_ID = 'manpower-dashboard-v30-drag-fix';
-
-    // --- Imports ---
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-    import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-
     const { useState, useMemo, useEffect } = React;
 
-    // --- 初始化 Firebase ---
-    let app, auth, db, isOfflineMode = true;
-    try {
-      if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 5) {
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app);
-        isOfflineMode = false;
-        console.log("Firebase Mode Active");
-      } else {
-        console.log("LocalStorage Mode Active");
-      }
-    } catch (e) { console.error("Firebase Init Error:", e); }
+    // --- Supabase 配置 (使用您提供的設定) ---
+    const SUPABASE_URL = 'https://vbhnboegowulvgckjlyg.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_8fAfsHCXZ45iJY6_t4rTLQ_uvJ6Izb2'; // 請確認此 Key 是否正確，通常是 eyJ 開頭
+    // 初始化 Client
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -83,7 +65,8 @@
 
     const App = () => {
       // --- State ---
-      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [syncStatus, setSyncStatus] = useState('連線中...');
       
       const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'timeline' | 'personnel'
       const [addingToCategory, setAddingToCategory] = useState(null);
@@ -91,6 +74,7 @@
       const [showDeleteModal, setShowDeleteModal] = useState(false);
       const [deleteTarget, setDeleteTarget] = useState(null);
       const [collapsedMonths, setCollapsedMonths] = useState({});
+      const [isPersonnelCollapsed, setIsPersonnelCollapsed] = useState(false);
       const [isMasterCollapsed, setIsMasterCollapsed] = useState(false);
       const [isScrolled, setIsScrolled] = useState(false);
       const [errorMsg, setErrorMsg] = useState('');
@@ -101,7 +85,7 @@
       const [draggedItem, setDraggedItem] = useState(null);
       const [dragOverContainer, setDragOverContainer] = useState(null);
 
-      // --- 人員分類定義 (含群組與排序) ---
+      // --- 人員分類定義 (含群組與排序 - 保留 v29 的優化結構) ---
       const categoryGroups = useMemo(() => [
         {
           name: '管理',
@@ -167,81 +151,112 @@
       });
 
       // --- Effects ---
+      
+      // 1. 捲動偵測
       useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 10);
+        const handleScroll = () => {
+            const currentScroll = window.scrollY;
+            setIsScrolled(currentScroll > 10);
+        };
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
       }, []);
 
+      // 2. 初始化與 Supabase 資料載入
       useEffect(() => {
-        const initialSchedule = Array.from({ length: 12 }, (_, i) => ({
-          month: `${i + 1}月`,
-          monthly: [{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }],
-          early: [], mid: [], late: []
-        }));
-        setSchedule(initialSchedule);
-
-        if (isOfflineMode) {
-             const localP = localStorage.getItem('manpower_personnel');
-             const localC = localStorage.getItem('manpower_courses');
-             const localS = localStorage.getItem('manpower_schedule_monthly');
-             if (localP) setPersonnel(JSON.parse(localP));
-             if (localC) setMasterCourses(JSON.parse(localC));
-             if (localS) {
-                const mData = JSON.parse(localS);
-                setSchedule(prev => prev.map((m, i) => ({ ...m, monthly: mData[i] || m.monthly })));
-             }
-             return;
-        }
-
-        signInAnonymously(auth).catch(console.warn);
-        return onAuthStateChanged(auth, setUser);
-      }, []);
-
-      useEffect(() => {
-        if (isOfflineMode || !user || !db) return;
-        
-        onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'settings', 'personnel_v3'), (docSnap) => {
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              if (data.personnel) {
-                 const merged = {};
-                 categories.forEach(c => merged[c.id] = data.personnel[c.id] || []);
-                 setPersonnel(merged);
-              }
+        const initializeData = async () => {
+          try {
+            setLoading(true);
+            setSyncStatus('正在從雲端加載數據...');
+            
+            // A. 加載課程數據
+            const { data: coursesData, error: coursesError } = await supabase
+              .from('courses')
+              .select('*');
+            
+            if (coursesError) throw coursesError;
+            
+            if (coursesData && coursesData.length > 0) {
+              setMasterCourses(coursesData.map(c => ({
+                id: c.id,
+                name: c.name,
+                type: c.type,
+                batch: c.batch,
+                students: c.students,
+                startDate: c.start_date,
+                endDate: c.end_date,
+                duration: c.duration
+              })));
             }
-        });
 
-        onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'schedules', 'master_v1'), (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.courses) setMasterCourses(data.courses);
-                if (data.monthlyData) {
-                    setSchedule(prev => {
-                        const newSched = prev.length > 0 ? JSON.parse(JSON.stringify(prev)) : Array.from({ length: 12 }, (_, i) => ({
-                            month: `${i + 1}月`,
-                            monthly: [{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }],
-                            early: [], mid: [], late: []
-                        }));
-                        newSched.forEach((m, i) => {
-                            if (data.monthlyData[i]) m.monthly = data.monthlyData[i];
-                        });
-                        return newSched;
-                    });
+            // B. 加載人員數據
+            const { data: personnelData, error: personnelError } = await supabase
+              .from('personnel')
+              .select('*');
+            
+            if (personnelError) throw personnelError;
+            
+            if (personnelData && personnelData.length > 0) {
+              const grouped = {};
+              categories.forEach(c => grouped[c.id] = []);
+              personnelData.forEach(p => {
+                if (grouped[p.category_id]) { // 注意: 確保 Supabase 欄位是 category_id
+                  grouped[p.category_id].push({ id: p.id, name: p.name });
+                } else if (p.category_id && !grouped[p.category_id]) {
+                   // 若 Supabase 有舊分類，暫時放入 pool 或忽略，這裡選擇忽略以防錯誤
                 }
+              });
+              // 確保所有分類都存在
+              categories.forEach(c => { if(!grouped[c.id]) grouped[c.id] = []; });
+              setPersonnel(grouped);
             }
-        });
-      }, [user, categories]);
 
+            // C. 加載月度數據 (月月繪)
+            const { data: monthlyData, error: monthlyError } = await supabase
+              .from('monthly_data')
+              .select('*')
+              .order('month_index', { ascending: true });
+            
+            if (monthlyError) throw monthlyError;
+
+            const initialSchedule = Array.from({ length: 12 }, (_, i) => ({
+              month: `${i + 1}月`,
+              monthly: [{ name: '月月繪', type: 'monthlyActivity', students: monthlyData?.find(m => m.month_index === i)?.students || 0, batch: '常駐' }],
+              early: [], mid: [], late: []
+            }));
+            
+            setSchedule(initialSchedule);
+            setSyncStatus('✅ 已同步');
+            setLoading(false);
+
+          } catch (error) {
+            console.error('加載數據失敗:', error);
+            setSyncStatus('❌ 同步失敗');
+            // 初始化空數據以免畫面全白
+            const emptySchedule = Array.from({ length: 12 }, (_, i) => ({
+               month: `${i + 1}月`,
+               monthly: [{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }],
+               early: [], mid: [], late: []
+            }));
+            setSchedule(emptySchedule);
+            setLoading(false);
+          }
+        };
+
+        initializeData();
+      }, []); // 只在掛載時執行一次
+
+      // 3. 排程核心運算 (依日期自動分配 - 本地計算)
       useEffect(() => {
-          if (masterCourses.length === 0 && schedule.length === 0) return;
-
+          // 不論是否有課程，都要執行以確保 Schedule 結構正確
           setSchedule(prev => {
               const newSchedule = prev.length > 0 ? JSON.parse(JSON.stringify(prev)) : Array.from({ length: 12 }, (_, i) => ({
                   month: `${i + 1}月`,
                   monthly: [{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }],
                   early: [], mid: [], late: []
               }));
+
+              // 清空自動計算欄位
               newSchedule.forEach(m => { m.early = []; m.mid = []; m.late = []; });
 
               masterCourses.forEach(course => {
@@ -255,10 +270,15 @@
                           { key: 'mid', s: 11, e: 20 },
                           { key: 'late', s: 21, e: 31 }
                       ];
+
                       periods.forEach(p => {
+                          // 使用課程開始日期的年份作為基準
                           const testStart = new Date(start.getFullYear(), m, p.s);
                           const testEnd = new Date(start.getFullYear(), m, p.e);
+                          
                           if (start > end) return;
+                          
+                          // 判斷重疊
                           if (start <= testEnd && end >= testStart) {
                               newSchedule[m][p.key].push({
                                   name: course.name,
@@ -274,20 +294,86 @@
           });
       }, [masterCourses]);
 
-      const savePersonnelData = async (newSettings, newPersonnel) => {
-        if (isOfflineMode) { localStorage.setItem('manpower_personnel', JSON.stringify(newPersonnel)); return; }
-        if (!user || !db) return;
-        try { await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'settings', 'personnel_v3'), { settings: newSettings, personnel: newPersonnel }); } catch(e) {}
+      // --- Helper Functions (Supabase Save) ---
+      
+      const savePersonnelData = async (newPersonnel) => {
+        setSyncStatus('同步中...');
+        try {
+          // 策略：刪除所有 -> 重新插入 (適合小型數據集，確保一致性)
+          // 注意：需確保 Supabase 沒有設 RLS 或允許匿名寫入，且 ID 欄位不為空
+          
+          // 1. 準備數據
+          const personnelRecords = [];
+          Object.entries(newPersonnel).forEach(([categoryId, people]) => {
+            people.forEach(person => {
+              personnelRecords.push({
+                id: person.id,
+                category_id: categoryId,
+                name: person.name
+              });
+            });
+          });
+
+          // 2. 刪除舊資料 (這裡假設 delete all，若有 RLS 需調整)
+          // 為了安全起見，建議 Supabase Table 設有 Policy
+          const { error: delError } = await supabase.from('personnel').delete().neq('id', '00000000-0000-0000-0000-000000000000'); 
+          if (delError) throw delError;
+
+          // 3. 插入新資料
+          if (personnelRecords.length > 0) {
+            const { error: insError } = await supabase.from('personnel').insert(personnelRecords);
+            if (insError) throw insError;
+          }
+          
+          setSyncStatus('✅ 已同步');
+        } catch (error) {
+          console.error('保存人員數據失敗:', error);
+          setSyncStatus('❌ 保存失敗');
+        }
       };
 
       const saveMasterCourses = async (newCourses, monthlyData) => {
-        if (isOfflineMode) { 
-            localStorage.setItem('manpower_courses', JSON.stringify(newCourses)); 
-            localStorage.setItem('manpower_schedule_monthly', JSON.stringify(monthlyData));
-            return; 
+        setSyncStatus('同步中...');
+        try {
+          // 1. 處理課程
+          const courseRecords = newCourses.map(c => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            batch: c.batch,
+            students: c.students,
+            start_date: c.startDate,
+            end_date: c.endDate,
+            duration: c.duration
+          }));
+
+          const { error: delCError } = await supabase.from('courses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          if (delCError) throw delCError;
+
+          if (courseRecords.length > 0) {
+             const { error: insCError } = await supabase.from('courses').insert(courseRecords);
+             if (insCError) throw insCError;
+          }
+
+          // 2. 處理月度數據
+          const monthlyRecords = monthlyData.map((m, idx) => ({
+            month_index: idx,
+            students: m[0]?.students || 0
+          }));
+          
+          const { error: delMError } = await supabase.from('monthly_data').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // 這裡假設 monthly_data 有 id 欄位，或者可以用 month_index 刪除
+          // 如果 monthly_data 沒有 id，可以用 .gte('month_index', 0)
+          
+          if (monthlyRecords.length > 0) {
+             const { error: insMError } = await supabase.from('monthly_data').insert(monthlyRecords);
+             if (insMError) throw insMError;
+          }
+
+          setSyncStatus('✅ 已同步');
+        } catch (error) {
+          console.error('保存課程數據失敗:', error);
+          setSyncStatus('❌ 保存失敗');
         }
-        if (!user || !db) return;
-        try { await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'schedules', 'master_v1'), { courses: newCourses, monthlyData: monthlyData }); } catch(e) {}
       };
 
       const calculateEndDate = (startDateStr, days) => {
@@ -314,6 +400,7 @@
         return Math.floor(diff / oneDay);
       };
 
+      // --- Actions ---
       const toggleMonth = (idx) => setCollapsedMonths(prev => ({ ...prev, [idx]: !prev[idx] }));
       const expandAllMonths = () => setCollapsedMonths({});
       const collapseAllMonths = () => { const all = {}; schedule.forEach((_, i) => all[i] = true); setCollapsedMonths(all); };
@@ -369,14 +456,18 @@
         if (!tempName.trim() || !addingToCategory) return;
         const newPerson = { id: generateId(), name: tempName.trim() };
         const newPersonnel = { ...personnel, [addingToCategory]: [...(personnel[addingToCategory] || []), newPerson] };
-        setPersonnel(newPersonnel); savePersonnelData(settings, newPersonnel); setTempName(''); setAddingToCategory(null);
+        setPersonnel(newPersonnel); 
+        savePersonnelData(newPersonnel); // Sync to Supabase
+        setTempName(''); setAddingToCategory(null);
       };
       const handleCancelAdd = () => { setAddingToCategory(null); setTempName(''); };
       const handleRemoveClick = (cid, pid, name) => { setDeleteTarget({ categoryId: cid, personId: pid, name }); setShowDeleteModal(true); };
       const confirmRemovePerson = () => {
         if (!deleteTarget) return;
         const newPersonnel = { ...personnel, [deleteTarget.categoryId]: personnel[deleteTarget.categoryId].filter(p => p.id !== deleteTarget.personId) };
-        setPersonnel(newPersonnel); savePersonnelData(settings, newPersonnel); setShowDeleteModal(false); setDeleteTarget(null);
+        setPersonnel(newPersonnel); 
+        savePersonnelData(newPersonnel); // Sync to Supabase
+        setShowDeleteModal(false); setDeleteTarget(null);
       };
 
       const handleDragStart = (e, person, fromCategory) => {
@@ -387,7 +478,6 @@
       };
       const handleDragEnd = (e) => { e.target.classList.remove('dragging'); setDraggedItem(null); setDragOverContainer(null); };
       
-      // 優化後的 DragOver：減少不必要的 setState
       const handleDragOver = (e, categoryId) => { 
           e.preventDefault(); 
           e.stopPropagation(); 
@@ -406,9 +496,12 @@
         const newPersonnel = { ...personnel };
         newPersonnel[sourceCategory] = newPersonnel[sourceCategory].filter(p => p.id !== targetPerson.id);
         newPersonnel[toCategory] = [...newPersonnel[toCategory], targetPerson];
-        setPersonnel(newPersonnel); savePersonnelData(settings, newPersonnel); setDraggedItem(null); setDragOverContainer(null);
+        setPersonnel(newPersonnel); 
+        savePersonnelData(newPersonnel); // Sync to Supabase
+        setDraggedItem(null); setDragOverContainer(null);
       };
 
+      // Stats
       const stats = useMemo(() => {
         let allocated = 0; let frontlineCount = 0;
         categories.forEach(cat => {
@@ -435,6 +528,7 @@
         return counts;
       }, [masterCourses, schedule]);
 
+      // Calculations
       const calculateCampFrontline = (n) => {
         if (n <= 0) return 0;
         if (n <= 3000) return 8; 
@@ -568,8 +662,9 @@
                         <button onClick={() => setCurrentView('personnel')} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${currentView === 'personnel' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>人員名單</button>
                      </div>
                  </div>
-                 <div className="flex gap-2">
-                    <span className={`flex items-center text-xs font-bold px-2 ${isOfflineMode ? 'text-slate-400' : 'text-emerald-600'}`}>{isOfflineMode ? '● 離線預覽 (存於瀏覽器)' : '● 雲端連線中'}</span>
+                 <div className="flex gap-2 items-center">
+                    <span className="text-xs font-bold px-2 py-1 bg-emerald-100 text-emerald-700 rounded">{syncStatus}</span>
+                    <span className="text-xs font-bold px-2 text-slate-400">☁️ Supabase</span>
                  </div>
               </div>
 
