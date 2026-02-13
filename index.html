@@ -17,21 +17,37 @@
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .dragging { opacity: 0.5; }
     .header-transition { transition: all 0.3s ease-in-out; }
-    .stats-container { transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, margin 0.3s ease-in-out; overflow: hidden; }
-    .stats-visible { max-height: 500px; opacity: 1; margin-bottom: 1.5rem; }
-    .stats-hidden { max-height: 0; opacity: 0; margin-bottom: 0; }
+    .stats-container {
+      transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, margin 0.3s ease-in-out;
+      overflow: hidden;
+    }
+    .stats-visible {
+      max-height: 500px;
+      opacity: 1;
+      margin-bottom: 1.5rem;
+    }
+    .stats-hidden {
+      max-height: 0;
+      opacity: 0;
+      margin-bottom: 0;
+    }
+    /* Timeline Styles */
+    .timeline-grid {
+      background-image: linear-gradient(to right, #f3f4f6 1px, transparent 1px);
+      background-size: 8.33% 100%; /* 100% / 12 months */
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
-    // --- Firebase 設定 ---
+    // --- Firebase 設定 (請填入您的設定) ---
     const firebaseConfig = {
       // apiKey: "...",
     };
 
-    const APP_ID = 'manpower-dashboard-v29-grouped-personnel';
+    const APP_ID = 'manpower-dashboard-v30-drag-fix';
 
     // --- Imports ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
@@ -40,7 +56,7 @@
 
     const { useState, useMemo, useEffect } = React;
 
-    // --- 初始化 ---
+    // --- 初始化 Firebase ---
     let app, auth, db, isOfflineMode = true;
     try {
       if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 5) {
@@ -48,6 +64,9 @@
         auth = getAuth(app);
         db = getFirestore(app);
         isOfflineMode = false;
+        console.log("Firebase Mode Active");
+      } else {
+        console.log("LocalStorage Mode Active");
       }
     } catch (e) { console.error("Firebase Init Error:", e); }
 
@@ -65,7 +84,8 @@
     const App = () => {
       // --- State ---
       const [user, setUser] = useState(null);
-      const [currentView, setCurrentView] = useState('dashboard');
+      
+      const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'timeline' | 'personnel'
       const [addingToCategory, setAddingToCategory] = useState(null);
       const [tempName, setTempName] = useState('');
       const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -102,7 +122,6 @@
         {
           name: '專案',
           items: [
-            // 對應舊資料：bootcamp -> camp_perspective (透視訓練營)
             { id: 'bootcamp', label: '透視訓練營', type: 'frontline' }, 
             { id: 'camp_color', label: '色彩訓練營', type: 'frontline' },
             { id: 'sketch', label: '速寫團練', type: 'frontline' },
@@ -112,7 +131,6 @@
         {
           name: '正課',
           items: [
-            // 對應舊資料：regular -> regular_perspective (透視)
             { id: 'regular', label: '透視', type: 'frontline' }, 
             { id: 'reg_comp', label: '構成', type: 'frontline' },
             { id: 'reg_color', label: '色彩', type: 'frontline' },
@@ -368,7 +386,17 @@
         setTimeout(() => e.target.classList.add('dragging'), 0);
       };
       const handleDragEnd = (e) => { e.target.classList.remove('dragging'); setDraggedItem(null); setDragOverContainer(null); };
-      const handleDragOver = (e, categoryId) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; if (dragOverContainer !== categoryId) setDragOverContainer(categoryId); };
+      
+      // 優化後的 DragOver：減少不必要的 setState
+      const handleDragOver = (e, categoryId) => { 
+          e.preventDefault(); 
+          e.stopPropagation(); 
+          e.dataTransfer.dropEffect = 'move'; 
+          if (dragOverContainer !== categoryId) {
+            setDragOverContainer(categoryId); 
+          }
+      };
+
       const handleDrop = (e, toCategory) => {
         e.preventDefault(); e.stopPropagation();
         let targetPerson = null; let sourceCategory = null;
@@ -518,52 +546,6 @@
           );
       };
 
-      const PersonnelView = () => {
-          return (
-             <div className="space-y-6 pb-20">
-                {categoryGroups.map((group, idx) => (
-                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
-                        <div className="p-3 bg-slate-50 border-b">
-                            <h3 className="text-sm font-black text-slate-700 px-1 border-l-4 border-blue-500 pl-2">{group.name}</h3>
-                        </div>
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                          {group.items.map((cat) => (
-                              <div key={cat.id} onDragOver={(e) => {e.preventDefault(); e.stopPropagation(); setDragOverContainer(cat.id);}} onDrop={(e) => {
-                                  e.preventDefault(); e.stopPropagation();
-                                  let targetPerson = null; let sourceCategory = null;
-                                  if (draggedItem) { targetPerson = draggedItem.person; sourceCategory = draggedItem.fromCategory; } 
-                                  else { try { const parsed = JSON.parse(e.dataTransfer.getData('application/json')); targetPerson = parsed.person; sourceCategory = parsed.fromCategory; } catch (err) {} }
-                                  if (!targetPerson || !sourceCategory || sourceCategory === cat.id) return;
-                                  const newPersonnel = { ...personnel };
-                                  newPersonnel[sourceCategory] = newPersonnel[sourceCategory].filter(p => p.id !== targetPerson.id);
-                                  newPersonnel[cat.id] = [...newPersonnel[cat.id], targetPerson];
-                                  setPersonnel(newPersonnel); savePersonnelData(settings, newPersonnel); setDraggedItem(null); setDragOverContainer(null);
-                              }} className={`rounded-xl border-2 transition-all min-h-[140px] flex flex-col ${cat.id === 'pool' ? 'bg-slate-200 border-slate-300' : 'bg-white border-slate-100'} ${dragOverContainer === cat.id ? 'border-blue-400 bg-blue-50' : ''}`}>
-                                <div className="p-2 flex justify-between items-center border-b"><span className="font-bold text-xs">{cat.label} <span className="bg-white px-1.5 rounded-full text-[10px]">{personnel[cat.id]?.length||0}</span></span><button onClick={(e) => { e.stopPropagation(); handleAddClick(cat.id); }} className="text-blue-500 font-bold px-2">+</button></div>
-                                <div className="p-2 flex-1 flex flex-col gap-2 max-h-[200px] overflow-y-auto">
-                                  {personnel[cat.id]?.map((p) => (
-                                    <div key={p.id} draggable onDragStart={(e) => {
-                                        setDraggedItem({ person: p, fromCategory: cat.id });
-                                        e.dataTransfer.effectAllowed = 'move';
-                                        e.dataTransfer.setData('application/json', JSON.stringify({ person: p, fromCategory: cat.id }));
-                                    }} className="bg-white border p-2 rounded shadow-sm flex justify-between group cursor-grab">
-                                      <span className="text-xs font-bold truncate">{p.name}</span>
-                                      <button onClick={() => handleRemoveClick(cat.id, p.id, p.name)} className="hidden group-hover:block text-rose-500">×</button>
-                                    </div>
-                                  ))}
-                                  {addingToCategory === cat.id && (
-                                    <div className="mt-2"><input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleConfirmAdd()} onBlur={() => tempName.trim() ? handleConfirmAdd() : handleCancelAdd()} className="w-full border-2 border-blue-400 rounded p-1 text-xs" placeholder="輸入姓名..." /></div>
-                                  )}
-                                </div>
-                              </div>
-                          ))}
-                        </div>
-                    </div>
-                ))}
-             </div>
-          );
-      };
-
       return (
         <div className="p-4 bg-slate-100 min-h-screen font-sans text-slate-900 text-[13px]">
           <div className="max-w-7xl mx-auto">
@@ -587,7 +569,7 @@
                      </div>
                  </div>
                  <div className="flex gap-2">
-                    <span className={`flex items-center text-xs font-bold px-2 ${isOfflineMode ? 'text-slate-400' : 'text-emerald-600'}`}>{isOfflineMode ? '● 離線預覽' : '● 雲端連線中'}</span>
+                    <span className={`flex items-center text-xs font-bold px-2 ${isOfflineMode ? 'text-slate-400' : 'text-emerald-600'}`}>{isOfflineMode ? '● 離線預覽 (存於瀏覽器)' : '● 雲端連線中'}</span>
                  </div>
               </div>
 
@@ -603,7 +585,39 @@
               )}
             </div>
 
-            {currentView === 'personnel' && <PersonnelView />}
+            {currentView === 'personnel' && (
+                <div className="space-y-6 pb-20">
+                    {categoryGroups.map((group, idx) => (
+                        <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+                            <div className="p-3 bg-slate-50 border-b">
+                                <h3 className="text-sm font-black text-slate-700 px-1 border-l-4 border-blue-500 pl-2">{group.name}</h3>
+                            </div>
+                            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                              {group.items.map((cat) => (
+                                  <div key={cat.id} 
+                                       onDragOver={(e) => handleDragOver(e, cat.id)} 
+                                       onDrop={(e) => handleDrop(e, cat.id)} 
+                                       className={`rounded-xl border-2 transition-all min-h-[140px] flex flex-col ${cat.id === 'pool' ? 'bg-slate-200 border-slate-300' : 'bg-white border-slate-100'} ${dragOverContainer === cat.id ? 'border-blue-400 bg-blue-50' : ''}`}>
+                                    <div className="p-2 flex justify-between items-center border-b"><span className="font-bold text-xs">{cat.label} <span className="bg-white px-1.5 rounded-full text-[10px]">{personnel[cat.id]?.length||0}</span></span><button onClick={(e) => { e.stopPropagation(); handleAddClick(cat.id); }} className="text-blue-500 font-bold px-2">+</button></div>
+                                    <div className="p-2 flex-1 flex flex-col gap-2 max-h-[200px] overflow-y-auto">
+                                      {personnel[cat.id]?.map((p) => (
+                                        <div key={p.id} draggable onDragStart={(e) => handleDragStart(e, p, cat.id)} onDragEnd={handleDragEnd} className="bg-white border p-2 rounded shadow-sm flex justify-between group cursor-grab">
+                                          <span className="text-xs font-bold truncate">{p.name}</span>
+                                          <button onClick={() => handleRemoveClick(cat.id, p.id, p.name)} className="hidden group-hover:block text-rose-500">×</button>
+                                        </div>
+                                      ))}
+                                      {addingToCategory === cat.id && (
+                                        <div className="mt-2"><input autoFocus value={tempName} onChange={(e) => setTempName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleConfirmAdd()} onBlur={() => tempName.trim() ? handleConfirmAdd() : handleCancelAdd()} className="w-full border-2 border-blue-400 rounded p-1 text-xs" placeholder="輸入姓名..." /></div>
+                                      )}
+                                    </div>
+                                  </div>
+                              ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            
             {currentView === 'timeline' && <TimelineView />}
             
             {currentView === 'dashboard' && (
