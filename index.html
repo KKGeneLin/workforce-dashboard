@@ -148,7 +148,6 @@
     ];
 
     // --- External Components ---
-    
     const KPICard = ({ title, value, icon, color }) => (
         <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex items-center gap-4 transition-transform hover:scale-[1.02]">
             <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
@@ -374,7 +373,9 @@
             if (table === 'personnel') {
                 await supabase.from('personnel').delete().neq('id', '0');
                 const records = [];
-                Object.entries(data).forEach(([catId, list]) => list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name })));
+                Object.entries(data).forEach(([catId, list]) => {
+                    list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name }));
+                });
                 if(records.length) await supabase.from('personnel').insert(records);
             }
             else if (table === 'courses') {
@@ -593,7 +594,7 @@
           Object.values(attendanceData).forEach(records => {
               const todayRecord = records[todayStr];
               if (todayRecord) {
-                  if (todayRecord.status === 'leave') leaveToday++;
+                  if (todayRecord.status === 'leave' || todayRecord.status === 'sick') leaveToday++;
                   else workingToday++;
               }
           });
@@ -722,6 +723,7 @@
                               </tbody>
                           </table>
                       </div>
+                      
                       {/* Popover */}
                       {wsPopover && (
                           <div className="fixed z-50 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: wsPopover.y + 5, left: Math.min(wsPopover.x - 60, window.innerWidth - 200) }}>
@@ -733,6 +735,7 @@
                           </div>
                       )}
                   </div>
+                  
                   {/* Batch Modal */}
                   {wsShowBatchModal && (
                       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -755,7 +758,7 @@
       );
       
       const TimelineView = (
-            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto fade-in">
+            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto">
                 <div className="min-w-[800px]">
                     <div className="flex items-center justify-between mb-4 px-2">
                         <button onClick={() => setTimelineYear(y => y - 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>
@@ -835,13 +838,11 @@
             <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen bg-slate-950">
                 {currentView === 'dashboard' && (
                     <div className="space-y-8 fade-in">
-                        {/* KPI & Dashboard Content (Same as before) */}
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <KPICard title="助教總人數" value={stats.total} icon={<Icons.Users />} color="bg-slate-800 text-slate-400" />
                             <KPICard title="目前已分配" value={stats.allocated} icon={<div className="w-2 h-2 rounded-full bg-emerald-500"></div>} color="bg-emerald-900/50 text-emerald-400" />
                             <KPICard title="總學生數" value={studentStats.total} icon={<div className="w-2 h-2 rounded-full bg-indigo-500"></div>} color="bg-indigo-900/50 text-indigo-400" />
                         </div>
-                        {/* ... Rest of Dashboard ... */}
                         <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
                             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                                 <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
@@ -849,7 +850,7 @@
                             </div>
                             <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程，請點擊右上角新增。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} />)}</tbody></table></div>
                         </div>
-                         <div>
+                        <div>
                             <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {schedule.map((m, idx) => (
@@ -932,7 +933,6 @@
                         </div>
                     </div>
                 )}
-                
                 {currentView === 'timeline' && TimelineView}
             </main>
 
