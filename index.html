@@ -1,11 +1,27 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>人力需求測算儀表板 (Supabase版)</title>
+  <title>人力需求測算儀表板 (深色模式)</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              850: '#1e293b', // Custom dark shade
+              900: '#0f172a',
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,30 +29,33 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
-    body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { background-color: #020617; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #e2e8f0; }
+    
+    /* 深色滾動條 */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
     .dragging { opacity: 0.5; }
     .header-transition { transition: all 0.3s ease-in-out; }
     .stats-container { transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, margin 0.3s ease-in-out; overflow: hidden; }
     .stats-visible { max-height: 500px; opacity: 1; margin-bottom: 1.5rem; }
     .stats-hidden { max-height: 0; opacity: 0; margin-bottom: 0; }
-    .timeline-grid { background-image: linear-gradient(to right, #f3f4f6 1px, transparent 1px); background-size: 8.33% 100%; }
+    .timeline-grid { background-image: linear-gradient(to right, #1e293b 1px, transparent 1px); background-size: 8.33% 100%; }
     
-    /* Attendance Grid Styles */
+    /* Attendance Grid Styles Dark Mode */
     .attendance-cell {
       transition: all 0.1s;
       cursor: pointer;
       height: 48px; 
       vertical-align: middle;
       padding: 2px;
-      border-right: 1px solid #f1f5f9;
-      border-bottom: 1px solid #f1f5f9;
+      border-right: 1px solid #1e293b;
+      border-bottom: 1px solid #1e293b;
     }
     .attendance-cell:hover {
-      background-color: #f8fafc;
+      background-color: #1e293b;
     }
     .task-block {
       width: 100%;
@@ -57,7 +76,7 @@
     .task-block:hover {
         transform: translateY(-1px);
         z-index: 20;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
     }
     .view-month .task-block:hover::after {
         content: attr(data-tooltip);
@@ -65,8 +84,8 @@
         bottom: 100%;
         left: 50%;
         transform: translateX(-50%);
-        background-color: #1e293b;
-        color: white;
+        background-color: #f1f5f9;
+        color: #0f172a;
         padding: 4px 8px;
         border-radius: 4px;
         font-size: 10px;
@@ -74,10 +93,11 @@
         margin-bottom: 4px;
         pointer-events: none;
         z-index: 50;
+        font-weight: bold;
     }
   </style>
 </head>
-<body>
+<body class="dark">
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
@@ -90,7 +110,7 @@
 
     const generateId = () => Math.random().toString(36).substr(2, 9);
 
-    // --- Icons ---
+    // --- Icons (Color adjusted for dark mode) ---
     const Icons = {
       Dashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
       Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
@@ -107,14 +127,14 @@
       Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
     };
 
-    // 工作類型定義
+    // 工作類型定義 (Color adjusted for dark mode)
     const TASK_TYPES = [
-        { id: 'teaching', label: '上課', color: 'bg-blue-500 text-white shadow-blue-200' },
-        { id: 'ta', label: '助教', color: 'bg-green-500 text-white shadow-green-200' },
-        { id: 'prep', label: '備課', color: 'bg-indigo-400 text-white shadow-indigo-200' },
-        { id: 'meeting', label: '會議', color: 'bg-purple-500 text-white shadow-purple-200' },
-        { id: 'project', label: '專案', color: 'bg-orange-400 text-white shadow-orange-200' },
-        { id: 'leave', label: '休假', color: 'bg-rose-500 text-white shadow-rose-200' },
+        { id: 'teaching', label: '上課', color: 'bg-blue-600 text-blue-50 shadow-sm shadow-blue-900/50' },
+        { id: 'ta', label: '助教', color: 'bg-emerald-600 text-emerald-50 shadow-sm shadow-emerald-900/50' },
+        { id: 'prep', label: '備課', color: 'bg-indigo-600 text-indigo-50 shadow-sm shadow-indigo-900/50' },
+        { id: 'meeting', label: '會議', color: 'bg-purple-600 text-purple-50 shadow-sm shadow-purple-900/50' },
+        { id: 'project', label: '專案', color: 'bg-orange-600 text-orange-50 shadow-sm shadow-orange-900/50' },
+        { id: 'leave', label: '休假', color: 'bg-rose-600 text-rose-50 shadow-sm shadow-rose-900/50' },
     ];
 
     const COURSE_TYPES = [
@@ -127,7 +147,6 @@
     ];
 
     const App = () => {
-      // --- State ---
       const [loading, setLoading] = useState(true);
       const [syncStatus, setSyncStatus] = useState('連線中...');
       const [currentView, setCurrentView] = useState('dashboard');
@@ -160,7 +179,7 @@
       // Work Schedule UI State
       const [wsSelectedMonth, setWsSelectedMonth] = useState(new Date());
       const [wsSearchTerm, setWsSearchTerm] = useState("");
-      const [wsViewMode, setWsViewMode] = useState('week'); // 'week' or 'month'
+      const [wsViewMode, setWsViewMode] = useState('week'); 
       const [wsExpandedGroups, setWsExpandedGroups] = useState({});
       const [wsPopover, setWsPopover] = useState(null);
       const [wsPopoverContext, setWsPopoverContext] = useState("");
@@ -214,7 +233,6 @@
           setLoading(true);
           setSyncStatus('同步中...');
 
-          // Safe Fetch Helper
           const safeFetch = async (table, options = {}) => {
               const query = supabase.from(table).select('*');
               if (options.order) query.order(options.order, { ascending: true });
@@ -234,7 +252,6 @@
                 safeFetch('attendance')
             ]);
 
-            // Personnel
             if (pData) {
                 const grouped = {};
                 categories.forEach(c => grouped[c.id] = []);
@@ -247,7 +264,6 @@
                 setPersonnel(grouped);
             }
 
-            // Courses
             if (cData) {
                 setMasterCourses(cData.map(c => ({
                     id: c.id, name: c.name, type: c.type, batch: c.batch,
@@ -255,7 +271,6 @@
                 })));
             }
 
-            // Schedule
             const initSchedule = Array.from({ length: 12 }, (_, i) => ({
                 month: `${i + 1}月`,
                 monthly: [{ name: '月月繪', type: 'monthlyActivity', students: mData?.find(m => m.month_index === i)?.students || 0, batch: '常駐' }],
@@ -263,7 +278,6 @@
             }));
             setSchedule(initSchedule);
 
-            // Attendance
             if (attData) {
                 const attMap = {};
                 attData.forEach(record => {
@@ -284,7 +298,6 @@
         initializeData();
       }, []);
 
-      // --- Schedule Logic ---
       useEffect(() => {
           setSchedule(prev => {
               const newSchedule = prev.length > 0 ? JSON.parse(JSON.stringify(prev)) : [];
@@ -309,53 +322,17 @@
           });
       }, [masterCourses]);
 
-      // --- Helpers & DB ---
       const calculateEndDate = (startStr, days) => {
           if (!startStr || !days) return '';
           const d = new Date(startStr);
           d.setDate(d.getDate() + parseInt(days) - 1);
           return d.toISOString().split('T')[0];
       };
-      
-      const updateAttendance = async (empId, date, status, context) => {
-          const newData = { ...attendanceData };
-          if (!newData[empId]) newData[empId] = {};
-          
-          if (!status) delete newData[empId][date]; 
-          else newData[empId][date] = { status, context };
-          
-          setAttendanceData(newData);
-          setSyncStatus('同步中...');
-          
-          try {
-            if (!status) {
-                await supabase.from('attendance').delete().match({ employee_id: empId, date: date });
-            } else {
-                await supabase.from('attendance').upsert({ employee_id: empId, date: date, status: status, context: context }, { onConflict: 'employee_id, date' });
-            }
-            setSyncStatus('✅ 已同步');
-          } catch(e) {
-            setSyncStatus('❌ 儲存失敗');
-          }
-      };
-      
-      const batchUpdateAttendance = async (records) => {
-          setSyncStatus('批量更新中...');
-          const newData = { ...attendanceData };
-          records.forEach(r => {
-             if (!newData[r.employee_id]) newData[r.employee_id] = {};
-             newData[r.employee_id][r.date] = { status: r.status, context: r.context };
-          });
-          setAttendanceData(newData);
-
-          try {
-             const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id, date' });
-             if (error) throw error;
-             setSyncStatus('✅ 批量完成');
-          } catch(e) {
-             console.error(e);
-             setSyncStatus('❌ 批量失敗');
-          }
+      const calculateDuration = (startStr, endStr) => {
+          if (!startStr || !endStr) return 0;
+          const s = new Date(startStr), e = new Date(endStr);
+          if (e < s) return 0;
+          return Math.ceil(Math.abs(e - s) / (86400000)) + 1;
       };
 
       const syncDB = async (table, data, deleteFilter = {}) => {
@@ -368,14 +345,16 @@
                     list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name }));
                 });
                 if(records.length) await supabase.from('personnel').insert(records);
-            } else if (table === 'courses') {
+            }
+            else if (table === 'courses') {
                 await supabase.from('courses').delete().neq('id', '0');
                 const records = data.map(c => ({
-                   id: c.id, name: c.name, type: c.type, batch: c.batch, students: c.students,
-                   start_date: c.startDate, end_date: c.endDate, duration: c.duration
+                    id: c.id, name: c.name, type: c.type, batch: c.batch,
+                    students: c.students, start_date: c.startDate, end_date: c.endDate, duration: c.duration
                 }));
                 if(records.length) await supabase.from('courses').insert(records);
-            } else if (table === 'monthly_data') {
+            }
+            else if (table === 'monthly_data') {
                 await supabase.from('monthly_data').delete().neq('id', '0');
                 const records = data.map((m, i) => ({ month_index: i, students: m[0]?.students || 0 }));
                 if(records.length) await supabase.from('monthly_data').insert(records);
@@ -383,8 +362,39 @@
             setSyncStatus('✅ 已同步');
         } catch(e) { console.error(e); setSyncStatus('❌ 失敗'); }
       };
+      
+      const updateAttendance = async (empId, date, status, context) => {
+          const newData = { ...attendanceData };
+          if (!newData[empId]) newData[empId] = {};
+          if (!status) delete newData[empId][date]; 
+          else newData[empId][date] = { status, context };
+          setAttendanceData(newData);
+          setSyncStatus('同步中...');
+          try {
+            if (!status) {
+                await supabase.from('attendance').delete().match({ employee_id: empId, date: date });
+            } else {
+                await supabase.from('attendance').upsert({ employee_id: empId, date: date, status: status, context: context }, { onConflict: 'employee_id, date' });
+            }
+            setSyncStatus('✅ 已同步');
+          } catch(e) { setSyncStatus('❌ 儲存失敗'); }
+      };
+      
+      const batchUpdateAttendance = async (records) => {
+          setSyncStatus('批量更新中...');
+          const newData = { ...attendanceData };
+          records.forEach(r => {
+             if (!newData[r.employee_id]) newData[r.employee_id] = {};
+             newData[r.employee_id][r.date] = { status: r.status, context: r.context };
+          });
+          setAttendanceData(newData);
+          try {
+             const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id, date' });
+             if (error) throw error;
+             setSyncStatus('✅ 批量完成');
+          } catch(e) { console.error(e); setSyncStatus('❌ 批量失敗'); }
+      };
 
-      // --- Handlers ---
       const handleAddCourse = () => {
           if (!newCourse.name || !newCourse.startDate) { setErrorMsg("請填寫必要資訊"); return; }
           const updated = [...masterCourses, { ...newCourse, id: generateId() }];
@@ -400,7 +410,7 @@
               const nc = { ...c, [field]: val };
               if (field === 'startDate') nc.endDate = calculateEndDate(val, nc.duration);
               if (field === 'duration') nc.endDate = calculateEndDate(nc.startDate, val);
-              if (field === 'endDate') nc.duration = (new Date(val) - new Date(nc.startDate)) / (1000*60*60*24) + 1;
+              if (field === 'endDate') nc.duration = calculateDuration(nc.startDate, val);
               return nc;
           });
           setMasterCourses(updated);
@@ -435,7 +445,6 @@
           syncDB('personnel', newPersonnel);
           setShowDeleteModal(false);
       };
-      
       const onDragStart = (e, person, fromCategory) => {
           setDraggedItem({ person, fromCategory });
           e.dataTransfer.effectAllowed = 'move';
@@ -455,19 +464,16 @@
           syncDB('personnel', newPersonnel);
           setDraggedItem(null);
       };
-
       const handleWsChangeMonth = (delta) => {
           const newDate = new Date(wsSelectedMonth);
           newDate.setMonth(newDate.getMonth() + delta);
           setWsSelectedMonth(newDate);
       };
-
       const handleWsCellClick = (e, empId, dateStr, context) => {
           const rect = e.target.getBoundingClientRect();
           setWsPopover({ empId, dateStr, x: rect.left, y: rect.bottom + window.scrollY });
           setWsPopoverContext(context || "");
       };
-
       const handleWsSaveCell = (status) => {
           if (wsPopover) {
               updateAttendance(wsPopover.empId, wsPopover.dateStr, status, wsPopoverContext);
@@ -475,7 +481,6 @@
               setWsPopoverContext("");
           }
       };
-
       const handleWsBatchSubmit = () => {
           if (!wsBatchForm.personId || !wsBatchForm.startDate || !wsBatchForm.endDate) { alert("請填寫完整資訊"); return; }
           const start = new Date(wsBatchForm.startDate);
@@ -494,7 +499,6 @@
           setWsBatchForm({ personId: '', startDate: '', endDate: '', type: 'teaching', context: '' });
       };
 
-      // Stats
       const stats = useMemo(() => {
           let allocated = 0; let frontline = 0;
           categories.forEach(c => {
@@ -526,35 +530,31 @@
           return { workingToday, leaveToday };
       }, [attendanceData]);
 
-      // --- Components ---
       const KPICard = ({ title, value, icon, color }) => (
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 transition-transform hover:scale-[1.02]">
+          <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex items-center gap-4 transition-transform hover:scale-[1.02]">
               <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
               <div>
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</div>
-                  <div className="text-2xl font-black text-slate-800">{value}</div>
+                  <div className="text-2xl font-black text-white">{value}</div>
               </div>
           </div>
       );
 
       const CourseRow = ({ course }) => (
-          <tr className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-              <td className="p-3 font-bold text-slate-700">{course.name}</td>
-              <td className="p-3 text-slate-500">{course.batch || '-'}</td>
-              <td className="p-3"><input type="date" value={course.startDate} onChange={e => handleUpdateCourse(course.id, 'startDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 outline-none w-28 text-sm" /></td>
-              <td className="p-3"><input type="number" value={course.duration} onChange={e => handleUpdateCourse(course.id, 'duration', e.target.value)} className="bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 outline-none w-12 text-center text-sm" /></td>
-              <td className="p-3"><input type="date" value={course.endDate} onChange={e => handleUpdateCourse(course.id, 'endDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 outline-none w-28 text-sm" /></td>
-              <td className="p-3"><input type="number" value={course.students} onChange={e => handleUpdateCourse(course.id, 'students', parseInt(e.target.value) || 0)} className="bg-transparent font-bold text-indigo-600 border-b border-dashed border-indigo-200 focus:border-indigo-500 outline-none w-16 text-center" /></td>
+          <tr className="border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors">
+              <td className="p-3 font-bold text-slate-200">{course.name}</td>
+              <td className="p-3 text-slate-400">{course.batch || '-'}</td>
+              <td className="p-3"><input type="date" value={course.startDate} onChange={e => handleUpdateCourse(course.id, 'startDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-28 text-sm text-slate-300" /></td>
+              <td className="p-3"><input type="number" value={course.duration} onChange={e => handleUpdateCourse(course.id, 'duration', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-12 text-center text-sm text-slate-300" /></td>
+              <td className="p-3"><input type="date" value={course.endDate} onChange={e => handleUpdateCourse(course.id, 'endDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-28 text-sm text-slate-300" /></td>
+              <td className="p-3"><input type="number" value={course.students} onChange={e => handleUpdateCourse(course.id, 'students', parseInt(e.target.value) || 0)} className="bg-transparent font-bold text-indigo-400 border-b border-dashed border-indigo-900 focus:border-indigo-400 outline-none w-16 text-center" /></td>
               <td className="p-3 text-right">
-                  <button onClick={() => handleDeleteCourse(course.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-1"><Icons.Trash /></button>
+                  <button onClick={() => handleDeleteCourse(course.id)} className="text-slate-500 hover:text-rose-500 transition-colors p-1"><Icons.Trash /></button>
               </td>
           </tr>
       );
 
-      // --- Views ---
-      
       const WorkScheduleView = () => {
-          // View Mode Logic (Week vs Month)
           const datesToShow = useMemo(() => {
               if (wsViewMode === 'month') {
                   const year = wsSelectedMonth.getFullYear();
@@ -562,7 +562,6 @@
                   const daysInMonth = new Date(year, month + 1, 0).getDate();
                   return Array.from({length: daysInMonth}, (_, i) => new Date(year, month, i + 1));
               } else {
-                  // Week view: Find start of week (Sunday)
                   const start = new Date(wsSelectedMonth);
                   const day = start.getDay();
                   start.setDate(start.getDate() - day); 
@@ -588,39 +587,36 @@
 
           return (
               <div className="fade-in space-y-4 pb-20">
-                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                  <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
                       <div className="flex items-center gap-4">
-                          <button onClick={() => handleWsNavigate(-1)} className="p-2 hover:bg-slate-100 rounded-full"><Icons.ChevronLeft /></button>
-                          <div className="text-lg font-bold text-slate-800 min-w-[120px] text-center">{title}</div>
-                          <button onClick={() => handleWsNavigate(1)} className="p-2 hover:bg-slate-100 rounded-full"><Icons.ChevronRight /></button>
+                          <button onClick={() => handleWsChangeMonth(-1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronLeft /></button>
+                          <div className="text-lg font-bold text-slate-100 min-w-[120px] text-center">{title}</div>
+                          <button onClick={() => handleWsChangeMonth(1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronRight /></button>
                       </div>
-                      
                       <div className="flex gap-2">
-                          <button onClick={() => setWsViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'week' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600'}`}>週檢視</button>
-                          <button onClick={() => setWsViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'month' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600'}`}>月檢視</button>
+                          <button onClick={() => setWsViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'week' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>週檢視</button>
+                          <button onClick={() => setWsViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>月檢視</button>
                       </div>
-
                       <div className="flex items-center gap-4">
-                           <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200"><Icons.Plus /> 新增紀錄</button>
-                           <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg"><Icons.Search /><input className="bg-transparent border-none outline-none text-sm w-32" placeholder="搜尋姓名..." value={wsSearchTerm} onChange={e => setWsSearchTerm(e.target.value)} /></div>
-                           <div className="flex gap-4 text-xs font-medium text-slate-500">
-                               <span>今日工作: <span className="text-blue-600 font-bold">{dailyStats.workingToday}</span></span>
-                               <span>休假: <span className="text-rose-500 font-bold">{dailyStats.leaveToday}</span></span>
+                           <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md shadow-indigo-900/50"><Icons.Plus /> 新增紀錄</button>
+                           <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"><Icons.Search /><input className="bg-transparent border-none outline-none text-sm w-32 text-slate-200" placeholder="搜尋姓名..." value={wsSearchTerm} onChange={e => setWsSearchTerm(e.target.value)} /></div>
+                           <div className="flex gap-4 text-xs font-medium text-slate-400">
+                               <span>今日工作: <span className="text-blue-400 font-bold">{dailyStats.workingToday}</span></span>
+                               <span>休假: <span className="text-rose-400 font-bold">{dailyStats.leaveToday}</span></span>
                            </div>
                       </div>
                   </div>
-
-                  <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative ${wsViewMode === 'month' ? 'view-month' : ''}`}>
+                  <div className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden relative ${wsViewMode === 'month' ? 'view-month' : ''}`}>
                       <div className="overflow-x-auto">
                           <table className="w-full text-xs border-collapse table-fixed">
                               <thead>
                                   <tr>
-                                      <th className="sticky left-0 bg-slate-50 z-20 border-b border-r border-slate-200 p-3 w-[150px] text-left font-bold text-slate-600">人員</th>
+                                      <th className="sticky left-0 bg-slate-900 z-20 border-b border-r border-slate-800 p-3 w-[150px] text-left font-bold text-slate-300">人員</th>
                                       {datesToShow.map(d => {
                                           const dayName = ['日','一','二','三','四','五','六'][d.getDay()];
                                           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                                           return (
-                                              <th key={d.toISOString()} className={`border-b border-r border-slate-100 p-1 text-center font-medium ${isWeekend ? 'bg-slate-50 text-rose-400' : 'text-slate-500'}`} style={{width: wsViewMode==='week' ? '12%' : '36px'}}>
+                                              <th key={d.toISOString()} className={`border-b border-r border-slate-800 p-1 text-center font-medium ${isWeekend ? 'bg-slate-800/50 text-rose-300' : 'text-slate-400'}`} style={{width: wsViewMode==='week' ? '12%' : '36px'}}>
                                                   <div className="text-[10px]">{d.getMonth()+1}/{d.getDate()}</div>
                                                   <div className="text-[9px]">({dayName})</div>
                                               </th>
@@ -631,27 +627,25 @@
                               <tbody>
                                   {filteredGroups.map(group => (
                                       <React.Fragment key={group.name}>
-                                          <tr className="bg-slate-50/80 cursor-pointer hover:bg-slate-100" onClick={() => setWsExpandedGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
-                                              <td className="sticky left-0 bg-slate-50 z-10 border-b border-r border-slate-200 p-2 font-bold text-indigo-600 pl-4 flex items-center gap-2" colSpan={datesToShow.length + 1}>
-                                                  {wsExpandedGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>} {group.name}
-                                              </td>
+                                          <tr className="bg-slate-800/50 cursor-pointer hover:bg-slate-800" onClick={() => setWsExpandedGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
+                                              <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 font-bold text-indigo-400 pl-4 flex items-center gap-2" colSpan={datesToShow.length + 1}>{wsExpandedGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>} {group.name}</td>
                                           </tr>
                                           {wsExpandedGroups[group.name] && group.items.map(cat => (
                                               cat.people.map(p => (
-                                                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                                      <td className="sticky left-0 bg-white z-10 border-b border-r border-slate-200 p-2 pl-6 font-medium text-slate-700 shadow-sm"><div className="flex items-center justify-between"><span>{p.name}</span><span className="text-[9px] text-slate-400 bg-slate-100 px-1 rounded">{cat.label}</span></div></td>
+                                                  <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
+                                                      <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 pl-6 font-medium text-slate-300 shadow-sm"><div className="flex items-center justify-between"><span>{p.name}</span><span className="text-[9px] text-slate-400 bg-slate-800 px-1 rounded border border-slate-700">{cat.label}</span></div></td>
                                                       {datesToShow.map(d => {
                                                           const dateStr = d.toISOString().split('T')[0];
                                                           const record = attendanceData[p.id]?.[dateStr];
                                                           const statusConfig = TASK_TYPES.find(t => t.id === record?.status);
                                                           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                                                           return (
-                                                              <td key={dateStr} onClick={(e) => handleWsCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-100 text-center attendance-cell relative ${isWeekend ? 'bg-slate-50/40' : ''}`}>
+                                                              <td key={dateStr} onClick={(e) => handleWsCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''}`}>
                                                                   {statusConfig ? (
-                                                                      <div className={`task-block ${statusConfig.color} shadow-sm`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
+                                                                      <div className={`task-block ${statusConfig.color}`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
                                                                           {wsViewMode === 'week' ? (record.context || statusConfig.label) : (record.context ? record.context.substring(0,2) : statusConfig.label.substring(0,1))}
                                                                       </div>
-                                                                  ) : <div className="w-full h-full opacity-0 hover:opacity-100 text-slate-300 text-[10px] flex items-center justify-center">+</div>}
+                                                                  ) : <div className="w-full h-full opacity-0 hover:opacity-100 text-slate-600 text-[10px] flex items-center justify-center">+</div>}
                                                               </td>
                                                           );
                                                       })}
@@ -666,11 +660,11 @@
                       
                       {/* Popover */}
                       {wsPopover && (
-                          <div className="fixed z-50 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: wsPopover.y + 5, left: Math.min(wsPopover.x - 60, window.innerWidth - 200) }}>
-                              <input type="text" placeholder="工作內容..." className="w-full text-xs border rounded p-1.5 mb-1 outline-none focus:border-indigo-500" autoFocus value={wsPopoverContext} onChange={e => setWsPopoverContext(e.target.value)} />
+                          <div className="fixed z-50 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: wsPopover.y + 5, left: Math.min(wsPopover.x - 60, window.innerWidth - 200) }}>
+                              <input type="text" placeholder="工作內容..." className="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 mb-1 outline-none focus:border-indigo-500 text-slate-200" autoFocus value={wsPopoverContext} onChange={e => setWsPopoverContext(e.target.value)} />
                               <div className="grid grid-cols-2 gap-1.5">{TASK_TYPES.map(type => (<button key={type.id} onClick={() => handleWsSaveCell(type.id)} className={`text-[10px] px-2 py-1.5 rounded text-center font-bold shadow-sm ${type.color} opacity-90 hover:opacity-100`}>{type.label}</button>))}</div>
-                              <div className="h-px bg-slate-100 my-1"></div>
-                              <button onClick={() => handleWsSaveCell(null)} className="text-xs px-2 py-1.5 rounded text-center font-medium text-slate-500 hover:bg-slate-100 w-full">清除紀錄</button>
+                              <div className="h-px bg-slate-700 my-1"></div>
+                              <button onClick={() => handleWsSaveCell(null)} className="text-xs px-2 py-1.5 rounded text-center font-medium text-slate-400 hover:bg-slate-700 w-full">清除紀錄</button>
                               <div className="fixed inset-0 z-[-1]" onClick={() => setWsPopover(null)}></div>
                           </div>
                       )}
@@ -678,17 +672,17 @@
                   
                   {/* Batch Modal */}
                   {wsShowBatchModal && (
-                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/20 backdrop-blur-sm p-4">
-                          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
-                              <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">新增紀錄</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-600"><Icons.X /></button></div>
+                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                          <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-800">
+                              <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增紀錄</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
                               <div className="space-y-4">
-                                  <div><label className="block text-xs font-bold text-slate-500 mb-1">人員</label><select className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" value={wsBatchForm.personId} onChange={e => setWsBatchForm({...wsBatchForm, personId: e.target.value})}><option value="">請選擇...</option>{categoryGroups.map(g => (<optgroup key={g.name} label={g.name}>{g.items.map(cat => personnel[cat.id]?.map(p => <option key={p.id} value={p.id}>{p.name} ({cat.label})</option>))}</optgroup>))}</select></div>
+                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">人員</label><select className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" value={wsBatchForm.personId} onChange={e => setWsBatchForm({...wsBatchForm, personId: e.target.value})}><option value="">請選擇...</option>{categoryGroups.map(g => (<optgroup key={g.name} label={g.name}>{g.items.map(cat => personnel[cat.id]?.map(p => <option key={p.id} value={p.id}>{p.name} ({cat.label})</option>))}</optgroup>))}</select></div>
                                   <div className="grid grid-cols-2 gap-4">
-                                      <div><label className="block text-xs font-bold text-slate-500 mb-1">開始</label><input type="date" className="w-full border rounded-lg p-2 text-sm" value={wsBatchForm.startDate} onChange={e => setWsBatchForm({...wsBatchForm, startDate: e.target.value})} /></div>
-                                      <div><label className="block text-xs font-bold text-slate-500 mb-1">結束</label><input type="date" className="w-full border rounded-lg p-2 text-sm" value={wsBatchForm.endDate} onChange={e => setWsBatchForm({...wsBatchForm, endDate: e.target.value})} /></div>
+                                      <div><label className="block text-xs font-bold text-slate-400 mb-1">開始</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.startDate} onChange={e => setWsBatchForm({...wsBatchForm, startDate: e.target.value})} /></div>
+                                      <div><label className="block text-xs font-bold text-slate-400 mb-1">結束</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.endDate} onChange={e => setWsBatchForm({...wsBatchForm, endDate: e.target.value})} /></div>
                                   </div>
-                                  <div><label className="block text-xs font-bold text-slate-500 mb-1">類型</label><div className="flex flex-wrap gap-2">{TASK_TYPES.map(t => (<button key={t.id} onClick={() => setWsBatchForm({...wsBatchForm, type: t.id})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shadow-sm ${wsBatchForm.type === t.id ? 'ring-2 ring-offset-1 ring-indigo-300' : 'opacity-80'} ${t.color}`}>{t.label}</button>))}</div></div>
-                                  <div><label className="block text-xs font-bold text-slate-500 mb-1">內容/備註</label><input type="text" className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" placeholder="S1助教、備課..." value={wsBatchForm.context} onChange={e => setWsBatchForm({...wsBatchForm, context: e.target.value})} /></div>
+                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">類型</label><div className="flex flex-wrap gap-2">{TASK_TYPES.map(t => (<button key={t.id} onClick={() => setWsBatchForm({...wsBatchForm, type: t.id})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shadow-sm ${wsBatchForm.type === t.id ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-80 border-transparent'} ${t.color}`}>{t.label}</button>))}</div></div>
+                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">內容/備註</label><input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" placeholder="S1助教、備課..." value={wsBatchForm.context} onChange={e => setWsBatchForm({...wsBatchForm, context: e.target.value})} /></div>
                                   <button onClick={handleWsBatchSubmit} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg mt-2">確認</button>
                               </div>
                           </div>
@@ -697,61 +691,53 @@
               </div>
           );
       };
-      
+
       const TimelineView = () => {
           const currentYear = new Date().getFullYear();
           const months = Array.from({length: 12}, (_, i) => i + 1);
           const getCourseColor = (type) => {
-              if (type === 'regular') return 'bg-blue-500 text-white';
-              if (type === 'sketch') return 'bg-orange-400 text-white';
-              if (type === 'camp30') return 'bg-emerald-500 text-white';
-              return 'bg-slate-400 text-white';
+              if (type === 'regular') return 'bg-blue-600 text-white';
+              if (type === 'sketch') return 'bg-orange-600 text-white';
+              if (type === 'camp30') return 'bg-emerald-600 text-white';
+              return 'bg-slate-600 text-white';
           };
 
           return (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 overflow-x-auto">
+            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto">
                 <div className="min-w-[800px]">
                     <div className="flex items-center justify-between mb-4 px-2">
-                        <button onClick={() => setTimelineYear(y => y - 1)} className="p-1 hover:bg-slate-100 rounded"><Icons.ChevronLeft /></button>
-                        <h2 className="text-lg font-bold text-slate-800">{timelineYear} 年課程時間軸</h2>
-                        <button onClick={() => setTimelineYear(y => y + 1)} className="p-1 hover:bg-slate-100 rounded"><Icons.ChevronRight /></button>
+                        <button onClick={() => setTimelineYear(y => y - 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>
+                        <h2 className="text-lg font-bold text-slate-100">{timelineYear} 年課程時間軸</h2>
+                        <button onClick={() => setTimelineYear(y => y + 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronRight /></button>
                     </div>
-                    <div className="flex border-b border-slate-200 pb-2 mb-2 sticky top-0 bg-white z-10">
-                        {months.map(m => (<div key={m} className="flex-1 text-center text-xs font-bold text-slate-500 border-r border-slate-100 last:border-0">{m}月</div>))}
+                    <div className="flex border-b border-slate-800 pb-2 mb-2 sticky top-0 bg-slate-900 z-10">
+                        {months.map(m => (<div key={m} className="flex-1 text-center text-xs font-bold text-slate-400 border-r border-slate-800 last:border-0">{m}月</div>))}
                     </div>
                     <div className="space-y-3 relative h-[500px] overflow-y-auto">
                         <div className="absolute inset-0 flex pointer-events-none z-0">
-                             {months.map(m => <div key={m} className="flex-1 border-r border-slate-100 last:border-0 h-full"></div>)}
+                             {months.map(m => <div key={m} className="flex-1 border-r border-slate-800 last:border-0 h-full"></div>)}
                         </div>
-                        {masterCourses.length === 0 && <div className="text-center text-slate-400 py-10">尚無課程資料</div>}
+                        {masterCourses.length === 0 && <div className="text-center text-slate-600 py-10">尚無課程資料</div>}
                         {masterCourses.sort((a,b) => new Date(a.startDate) - new Date(b.startDate)).map(course => {
                             if (!course.startDate || !course.endDate) return null;
                             const start = new Date(course.startDate);
                             const end = new Date(course.endDate);
-                            
-                            // Check if course is within selected timeline year
                             if (start.getFullYear() !== timelineYear && end.getFullYear() !== timelineYear) return null;
-
-                            // Calculate position based on the selected timeline year
                             const yearStart = new Date(timelineYear, 0, 1).getTime();
                             const yearEnd = new Date(timelineYear, 11, 31).getTime();
                             const yearDuration = yearEnd - yearStart;
-                            
                             const cStart = Math.max(start.getTime(), yearStart);
                             const cEnd = Math.min(end.getTime(), yearEnd);
-                            
-                            if (cEnd < cStart) return null; // Course not in this year
-
+                            if (cEnd < cStart) return null;
                             const left = ((cStart - yearStart) / yearDuration) * 100;
                             const width = ((cEnd - cStart) / yearDuration) * 100;
-
                             return (
                                 <div key={course.id} className="relative h-8 z-10 hover:z-20 group">
                                     <div className={`absolute h-6 rounded-md shadow-sm text-[10px] flex items-center px-2 cursor-pointer transition-all hover:scale-105 ${getCourseColor(course.type)}`}
                                         style={{ left: `${left}%`, width: `${width}%`, minWidth: '40px' }}
                                         title={`${course.name} (${course.startDate} ~ ${course.endDate})`}>
                                         <span className="truncate font-bold">{course.name} {course.batch && `(${course.batch})`}</span>
-                                        <div className="hidden group-hover:block absolute bottom-full left-0 mb-1 bg-slate-800 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap z-50">
+                                        <div className="hidden group-hover:block absolute bottom-full left-0 mb-1 bg-slate-900 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap z-50 border border-slate-700">
                                             <div className="font-bold text-sm">{course.name}</div>
                                             <div>期數: {course.batch || '-'}</div>
                                             <div>日期: {course.startDate} ~ {course.endDate}</div>
@@ -767,70 +753,68 @@
           );
       };
 
-      if (loading) return <div className="h-screen flex items-center justify-center text-slate-400 font-medium">載入中...</div>;
+      if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-400 font-medium">載入中...</div>;
 
       return (
         <div className="flex min-h-screen">
-            {/* Sidebar */}
-            <nav className="fixed md:relative bottom-0 w-full md:w-64 bg-white border-t md:border-r border-slate-200 z-50 flex md:flex-col justify-around md:justify-start p-2 md:p-6 md:space-y-6 shadow-lg md:shadow-none">
+            <nav className="fixed md:relative bottom-0 w-full md:w-64 bg-slate-900 border-t md:border-r border-slate-800 z-50 flex md:flex-col justify-around md:justify-start p-2 md:p-6 md:space-y-6 shadow-lg md:shadow-none">
                 <div className="hidden md:flex items-center gap-3 px-2 mb-4">
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div>
-                    <span className="font-black text-xl text-slate-800 tracking-tight">人力儀表板</span>
+                    <span className="font-black text-xl text-slate-100 tracking-tight">人力儀表板</span>
                 </div>
-                <button onClick={() => setCurrentView('dashboard')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'dashboard' ? 'active' : 'text-slate-500 hover:bg-slate-50'}`}><Icons.Dashboard /> <span className="hidden md:inline">儀表板</span></button>
-                <button onClick={() => setCurrentView('attendance')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'attendance' ? 'active' : 'text-slate-500 hover:bg-slate-50'}`}><Icons.ClipboardCheck /> <span className="hidden md:inline">工作班表</span></button>
-                <button onClick={() => setCurrentView('timeline')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'timeline' ? 'active' : 'text-slate-500 hover:bg-slate-50'}`}><Icons.Calendar /> <span className="hidden md:inline">課程時間軸</span></button>
-                <button onClick={() => setCurrentView('personnel')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'personnel' ? 'active' : 'text-slate-500 hover:bg-slate-50'}`}><Icons.Users /> <span className="hidden md:inline">人員名單</span></button>
-                <div className="hidden md:block mt-auto pt-6 border-t border-slate-100"><div className="flex items-center gap-2 text-xs font-bold text-slate-400 px-4"><Icons.Cloud /> <span>{syncStatus}</span></div></div>
+                <button onClick={() => setCurrentView('dashboard')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'dashboard' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Dashboard /> <span className="hidden md:inline">儀表板</span></button>
+                <button onClick={() => setCurrentView('attendance')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'attendance' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.ClipboardCheck /> <span className="hidden md:inline">工作班表</span></button>
+                <button onClick={() => setCurrentView('timeline')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'timeline' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Calendar /> <span className="hidden md:inline">課程時間軸</span></button>
+                <button onClick={() => setCurrentView('personnel')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'personnel' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Users /> <span className="hidden md:inline">人員名單</span></button>
+                <div className="hidden md:block mt-auto pt-6 border-t border-slate-800"><div className="flex items-center gap-2 text-xs font-bold text-slate-500 px-4"><Icons.Cloud /> <span>{syncStatus}</span></div></div>
             </nav>
 
-            {/* Content */}
-            <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen">
+            <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen bg-slate-950">
                 {currentView === 'dashboard' && (
                     <div className="space-y-8 fade-in">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <KPICard title="助教總人數" value={stats.total} icon={<Icons.Users />} color="bg-slate-100 text-slate-600" />
-                            <KPICard title="目前已分配" value={stats.allocated} icon={<div className="w-2 h-2 rounded-full bg-emerald-500"></div>} color="bg-emerald-50 text-emerald-600" />
-                            <KPICard title="總學生數" value={studentStats.total} icon={<div className="w-2 h-2 rounded-full bg-indigo-500"></div>} color="bg-indigo-50 text-indigo-600" />
+                            <KPICard title="助教總人數" value={stats.total} icon={<Icons.Users />} color="bg-slate-800 text-slate-400" />
+                            <KPICard title="目前已分配" value={stats.allocated} icon={<div className="w-2 h-2 rounded-full bg-emerald-500"></div>} color="bg-emerald-900/50 text-emerald-400" />
+                            <KPICard title="總學生數" value={studentStats.total} icon={<div className="w-2 h-2 rounded-full bg-indigo-500"></div>} color="bg-indigo-900/50 text-indigo-400" />
                         </div>
-                        <div className="glass-panel rounded-2xl overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white/50">
-                                <div><h2 className="text-lg font-bold text-slate-800">年度課程總表</h2><p className="text-xs text-slate-400 mt-1">管理所有開設計畫與人數預估</p></div>
-                                <button onClick={() => setShowCourseModal(true)} className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors shadow-lg shadow-slate-200"><Icons.Plus /> 新增課程</button>
+                        <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
+                            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                                <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
+                                <button onClick={() => setShowCourseModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/50"><Icons.Plus /> 新增課程</button>
                             </div>
-                            <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-slate-50/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-white divide-y divide-slate-50">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-400 italic">尚未建立任何課程，請點擊右上角新增。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} />)}</tbody></table></div>
+                            <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程，請點擊右上角新增。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} />)}</tbody></table></div>
                         </div>
                         <div>
-                            <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-800">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-white px-3 py-1.5 rounded-lg border hover:bg-slate-50 font-bold text-slate-600">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-white px-3 py-1.5 rounded-lg border hover:bg-slate-50 font-bold text-slate-600">全部收合</button></div></div>
+                            <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {schedule.map((m, idx) => (
-                                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group hover:shadow-md transition-all">
-                                        <div className="bg-slate-50 p-3 flex justify-between items-center cursor-pointer border-b border-slate-100" onClick={() => setCollapsedMonths(prev => ({...prev, [idx]: !prev[idx]}))}>
-                                            <div className="font-black text-slate-700 text-lg flex items-center gap-2">{m.month}{collapsedMonths[idx] && <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 rounded">已收合</span>}</div>
-                                            <div className="text-slate-400">{collapsedMonths[idx] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
+                                    <div key={idx} className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden group hover:shadow-md transition-all">
+                                        <div className="bg-slate-800 p-3 flex justify-between items-center cursor-pointer border-b border-slate-700" onClick={() => setCollapsedMonths(prev => ({...prev, [idx]: !prev[idx]}))}>
+                                            <div className="font-black text-slate-200 text-lg flex items-center gap-2">{m.month}{collapsedMonths[idx] && <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 rounded">已收合</span>}</div>
+                                            <div className="text-slate-500">{collapsedMonths[idx] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
                                         </div>
                                         {!collapsedMonths[idx] && (
-                                            <div className="divide-y divide-slate-50 text-xs">
+                                            <div className="divide-y divide-slate-800 text-xs">
                                                 {['early', 'mid', 'late'].map(pKey => {
                                                     const hasCourse = m[pKey].length > 0;
                                                     return (
-                                                        <div key={pKey} className={`p-3 ${hasCourse ? 'bg-white' : 'bg-slate-50/30'}`}>
-                                                            <div className="font-bold text-slate-400 text-[10px] uppercase mb-2 tracking-wider">{pKey === 'early' ? '上旬 (1-10)' : pKey === 'mid' ? '中旬 (11-20)' : '下旬 (21+)'}</div>
+                                                        <div key={pKey} className={`p-3 ${hasCourse ? 'bg-slate-900' : 'bg-slate-800/30'}`}>
+                                                            <div className="font-bold text-slate-500 text-[10px] uppercase mb-2 tracking-wider">{pKey === 'early' ? '上旬 (1-10)' : pKey === 'mid' ? '中旬 (11-20)' : '下旬 (21+)'}</div>
                                                             <div className="space-y-1.5">
                                                                 {m[pKey].map((p, i) => (
-                                                                    <div key={i} className="flex justify-between items-center bg-indigo-50/50 p-1.5 rounded border border-indigo-100/50">
-                                                                        <span className="font-bold text-slate-700">{p.name} <span className="font-normal text-slate-400 scale-90 inline-block">{p.batch}</span></span>
-                                                                        <span className="font-bold text-indigo-600 bg-white px-1.5 rounded shadow-sm">{p.students}</span>
+                                                                    <div key={i} className="flex justify-between items-center bg-indigo-900/30 p-1.5 rounded border border-indigo-900/50">
+                                                                        <span className="font-bold text-slate-300">{p.name} <span className="font-normal text-slate-500 scale-90 inline-block">{p.batch}</span></span>
+                                                                        <span className="font-bold text-indigo-400 bg-slate-800 px-1.5 rounded shadow-sm">{p.students}</span>
                                                                     </div>
                                                                 ))}
-                                                                {!hasCourse && <div className="text-slate-300 text-[10px] text-center italic">- 空閒 -</div>}
+                                                                {!hasCourse && <div className="text-slate-600 text-[10px] text-center italic">- 空閒 -</div>}
                                                             </div>
                                                         </div>
                                                     );
                                                 })}
-                                                <div className="p-3 bg-slate-50 flex justify-between items-center">
-                                                    <span className="font-bold text-slate-600">月月繪</span>
-                                                    <input type="number" value={m.monthly[0].students} onChange={e => handleMonthlyChange(idx, parseInt(e.target.value)||0)} className="w-16 text-center bg-white border border-slate-200 rounded px-1 py-0.5 outline-none focus:border-indigo-500 font-bold text-indigo-600" />
+                                                <div className="p-3 bg-slate-800 flex justify-between items-center">
+                                                    <span className="font-bold text-slate-400">月月繪</span>
+                                                    <input type="number" value={m.monthly[0].students} onChange={e => handleMonthlyChange(idx, parseInt(e.target.value)||0)} className="w-16 text-center bg-slate-900 border border-slate-700 rounded px-1 py-0.5 outline-none focus:border-indigo-500 font-bold text-indigo-400 text-slate-200" />
                                                 </div>
                                             </div>
                                         )}
@@ -845,33 +829,33 @@
                 {currentView === 'personnel' && (
                     <div className="fade-in max-w-5xl mx-auto">
                         <div className="flex justify-between items-end mb-6">
-                            <div><h2 className="text-2xl font-black text-slate-800">人員名單管理</h2><p className="text-sm text-slate-500 mt-1">拖曳卡片以調整職位，點擊 + 號新增人員</p></div>
-                            <div className="flex gap-2"><button onClick={() => setCollapsedPersonnelGroups({})} className="text-xs bg-white border px-3 py-1.5 rounded-lg hover:bg-slate-50 font-bold text-slate-600">全部展開</button><button onClick={() => {const all={}; categoryGroups.forEach(g=>all[g.name]=true); setCollapsedPersonnelGroups(all);}} className="text-xs bg-white border px-3 py-1.5 rounded-lg hover:bg-slate-50 font-bold text-slate-600">全部收合</button></div>
+                            <div><h2 className="text-2xl font-black text-slate-100">人員名單管理</h2><p className="text-sm text-slate-500 mt-1">拖曳卡片以調整職位，點擊 + 號新增人員</p></div>
+                            <div className="flex gap-2"><button onClick={() => setCollapsedPersonnelGroups({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => {const all={}; categoryGroups.forEach(g=>all[g.name]=true); setCollapsedPersonnelGroups(all);}} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div>
                         </div>
                         <div className="space-y-6">
                             {categoryGroups.map((group, gIdx) => (
-                                <div key={gIdx} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <div className="p-4 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => setCollapsedPersonnelGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
-                                        <div className="flex items-center gap-3"><div className="w-1 h-6 bg-indigo-500 rounded-full"></div><h3 className="font-bold text-slate-700">{group.name}</h3></div>
-                                        <div className="text-slate-400">{collapsedPersonnelGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
+                                <div key={gIdx} className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
+                                    <div className="p-4 bg-slate-800/80 border-b border-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => setCollapsedPersonnelGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
+                                        <div className="flex items-center gap-3"><div className="w-1 h-6 bg-indigo-500 rounded-full"></div><h3 className="font-bold text-slate-200">{group.name}</h3></div>
+                                        <div className="text-slate-500">{collapsedPersonnelGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
                                     </div>
                                     {!collapsedPersonnelGroups[group.name] && (
-                                        <div className="p-6 bg-slate-50/30 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        <div className="p-6 bg-slate-900/30 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                             {group.items.map(cat => (
-                                                <div key={cat.id} onDragOver={e => onDragOver(e, cat.id)} onDrop={e => onDrop(e, cat.id)} className={`bg-white rounded-xl border-2 border-dashed border-slate-200 p-3 flex flex-col h-[180px] transition-all duration-200 ${dragOverContainer === cat.id ? 'drag-over scale-[1.02]' : 'hover:border-slate-300'}`}>
-                                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-50">
-                                                        <span className="font-bold text-xs text-slate-600 flex items-center gap-1">{cat.label} <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md text-[10px]">{personnel[cat.id]?.length || 0}</span></span>
-                                                        <button onClick={(e) => { e.stopPropagation(); setAddingToCategory(cat.id); setTempName(''); }} className="text-slate-300 hover:text-indigo-600 transition-colors"><Icons.Plus /></button>
+                                                <div key={cat.id} onDragOver={e => onDragOver(e, cat.id)} onDrop={e => onDrop(e, cat.id)} className={`bg-slate-900 rounded-xl border-2 border-dashed border-slate-800 p-3 flex flex-col h-[180px] transition-all duration-200 ${dragOverContainer === cat.id ? 'drag-over scale-[1.02]' : 'hover:border-slate-700'}`}>
+                                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+                                                        <span className="font-bold text-xs text-slate-400 flex items-center gap-1">{cat.label} <span className="bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md text-[10px]">{personnel[cat.id]?.length || 0}</span></span>
+                                                        <button onClick={(e) => { e.stopPropagation(); setAddingToCategory(cat.id); setTempName(''); }} className="text-slate-600 hover:text-indigo-400 transition-colors"><Icons.Plus /></button>
                                                     </div>
                                                     <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                                                         {personnel[cat.id]?.map(p => (
-                                                            <div key={p.id} draggable onDragStart={e => onDragStart(e, p, cat.id)} className="group bg-white border border-slate-100 p-2 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-200 hover:shadow-md transition-all flex justify-between items-center">
-                                                                <span className="text-xs font-medium text-slate-700">{p.name}</span>
-                                                                <button onClick={() => {setDeleteTarget({categoryId:cat.id, personId:p.id}); setShowDeleteModal(true);}} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
+                                                            <div key={p.id} draggable onDragStart={e => onDragStart(e, p, cat.id)} className="group bg-slate-800 border border-slate-700 p-2 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-900 hover:shadow-md transition-all flex justify-between items-center">
+                                                                <span className="text-xs font-medium text-slate-300">{p.name}</span>
+                                                                <button onClick={() => {setDeleteTarget({categoryId:cat.id, personId:p.id}); setShowDeleteModal(true);}} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
                                                             </div>
                                                         ))}
-                                                        {addingToCategory === cat.id && (<div className="animate-in fade-in"><input autoFocus value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleConfirmAddPerson()} onBlur={() => tempName.trim() ? handleConfirmAddPerson() : setAddingToCategory(null)} placeholder="輸入姓名..." className="w-full text-xs p-2 border-2 border-indigo-400 rounded-lg outline-none shadow-sm" /></div>)}
-                                                        {(!personnel[cat.id]?.length && addingToCategory !== cat.id) && (<div className="h-full flex items-center justify-center text-[10px] text-slate-300 italic">拖曳至此</div>)}
+                                                        {addingToCategory === cat.id && (<div className="animate-in fade-in"><input autoFocus value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleConfirmAddPerson()} onBlur={() => tempName.trim() ? handleConfirmAddPerson() : setAddingToCategory(null)} placeholder="輸入姓名..." className="w-full text-xs p-2 border-2 border-indigo-500 bg-slate-800 text-slate-200 rounded-lg outline-none shadow-sm" /></div>)}
+                                                        {(!personnel[cat.id]?.length && addingToCategory !== cat.id) && (<div className="h-full flex items-center justify-center text-[10px] text-slate-600 italic">拖曳至此</div>)}
                                                     </div>
                                                 </div>
                                             ))}
@@ -887,32 +871,32 @@
 
             {/* Modals */}
             {showCourseModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/20 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">新增課程計畫</h3><button onClick={() => setShowCourseModal(false)} className="text-slate-400 hover:text-slate-600"><Icons.X /></button></div>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 border border-slate-800">
+                        <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增課程計畫</h3><button onClick={() => setShowCourseModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1">課程名稱</label><select value={newCourse.name} onChange={e => { const sel = COURSE_TYPES.find(c => c.label === e.target.value); setNewCourse({...newCourse, name:e.target.value, type:sel.value, duration:sel.days}); }} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">{COURSE_TYPES.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}</select></div>
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1">期數 (如 S1)</label><input type="text" value={newCourse.batch} onChange={e => setNewCourse({...newCourse, batch:e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" placeholder="S1" /></div>
+                                <div><label className="block text-xs font-bold text-slate-400 mb-1">課程名稱</label><select value={newCourse.name} onChange={e => { const sel = COURSE_TYPES.find(c => c.label === e.target.value); setNewCourse({...newCourse, name:e.target.value, type:sel.value, duration:sel.days}); }} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200">{COURSE_TYPES.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-slate-400 mb-1">期數 (如 S1)</label><input type="text" value={newCourse.batch} onChange={e => setNewCourse({...newCourse, batch:e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" placeholder="S1" /></div>
                             </div>
                             <div className="grid grid-cols-3 gap-4">
-                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-500 mb-1">開始日期</label><input type="date" value={newCourse.startDate} onChange={e => setNewCourse({...newCourse, startDate:e.target.value, endDate: calculateEndDate(e.target.value, newCourse.duration)})} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-500 mb-1">天數</label><input type="number" value={newCourse.duration} onChange={e => setNewCourse({...newCourse, duration:e.target.value, endDate: calculateEndDate(newCourse.startDate, e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-400 mb-1">結束日期 (自動)</label><input type="date" value={newCourse.endDate} readOnly className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-500 outline-none cursor-not-allowed" /></div>
+                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-400 mb-1">開始日期</label><input type="date" value={newCourse.startDate} onChange={e => setNewCourse({...newCourse, startDate:e.target.value, endDate: calculateEndDate(e.target.value, newCourse.duration)})} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" /></div>
+                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-400 mb-1">天數</label><input type="number" value={newCourse.duration} onChange={e => setNewCourse({...newCourse, duration:e.target.value, endDate: calculateEndDate(newCourse.startDate, e.target.value)})} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" /></div>
+                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-500 mb-1">結束日期 (自動)</label><input type="date" value={newCourse.endDate} readOnly className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-600 outline-none cursor-not-allowed" /></div>
                             </div>
-                            <div><label className="block text-xs font-bold text-slate-500 mb-1">預估人數</label><input type="number" value={newCourse.students} onChange={e => setNewCourse({...newCourse, students:parseInt(e.target.value)||0})} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-600" placeholder="0" /></div>
-                            {errorMsg && <div className="text-rose-500 text-xs font-bold bg-rose-50 p-2 rounded">{errorMsg}</div>}
-                            <div className="pt-4 flex gap-3"><button onClick={() => setShowCourseModal(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors">取消</button><button onClick={handleAddCourse} className="flex-1 py-3 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-indigo-200 transition-all transform active:scale-95">確認新增</button></div>
+                            <div><label className="block text-xs font-bold text-slate-400 mb-1">預估人數</label><input type="number" value={newCourse.students} onChange={e => setNewCourse({...newCourse, students:parseInt(e.target.value)||0})} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-400" placeholder="0" /></div>
+                            {errorMsg && <div className="text-rose-400 text-xs font-bold bg-rose-900/30 p-2 rounded">{errorMsg}</div>}
+                            <div className="pt-4 flex gap-3"><button onClick={() => setShowCourseModal(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-800 transition-colors">取消</button><button onClick={handleAddCourse} className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-900/50 transition-all transform active:scale-95">確認新增</button></div>
                         </div>
                     </div>
                 </div>
             )}
             {showDeleteModal && (
-              <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95">
-                  <h3 className="font-bold text-lg text-slate-800 mb-2">確認刪除?</h3>
-                  <p className="text-slate-500 text-sm mb-6">此動作無法復原，請確認是否要移除此項目。</p>
-                  <div className="flex gap-3"><button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button><button onClick={handleRemovePerson} className="flex-1 py-2.5 rounded-xl font-bold bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-100">刪除</button></div>
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-slate-800">
+                  <h3 className="font-bold text-lg text-slate-100 mb-2">確認刪除?</h3>
+                  <p className="text-slate-400 text-sm mb-6">此動作無法復原，請確認是否要移除此項目。</p>
+                  <div className="flex gap-3"><button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-800">取消</button><button onClick={handleRemovePerson} className="flex-1 py-2.5 rounded-xl font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-900/50">刪除</button></div>
                 </div>
               </div>
             )}
