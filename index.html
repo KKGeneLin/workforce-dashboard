@@ -147,7 +147,7 @@
         { label: '速寫團練', value: 'sketch', days: 60 },
     ];
 
-    // --- External Components (Defined outside App to avoid reference errors) ---
+    // --- External Components ---
     
     const KPICard = ({ title, value, icon, color }) => (
         <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex items-center gap-4 transition-transform hover:scale-[1.02]">
@@ -178,11 +178,11 @@
       const [loading, setLoading] = useState(true);
       const [syncStatus, setSyncStatus] = useState('連線中...');
       const [currentView, setCurrentView] = useState('dashboard');
+      const [forceRefresh, setForceRefresh] = useState(0); 
       
       const [masterCourses, setMasterCourses] = useState([]);
       const [schedule, setSchedule] = useState([]);
       const [personnel, setPersonnel] = useState({});
-      
       const [attendanceData, setAttendanceData] = useState({}); 
       
       const [draggedItem, setDraggedItem] = useState(null);
@@ -255,7 +255,7 @@
          }
       }, [categoryGroups]);
 
-      // --- Main Data Loading (Safe Fetch) ---
+      // --- Main Data Loading ---
       useEffect(() => {
         const initializeData = async () => {
           setLoading(true);
@@ -272,7 +272,7 @@
                 }
                 return data || [];
               } catch (e) {
-                console.warn(`Supabase: 讀取 ${table} 異常`, e);
+                console.warn(`Supabase Exception`, e);
                 return [];
               }
           };
@@ -333,7 +333,7 @@
           }
         };
         initializeData();
-      }, []);
+      }, [forceRefresh]);
 
       // --- Schedule Logic ---
       useEffect(() => {
@@ -374,9 +374,7 @@
             if (table === 'personnel') {
                 await supabase.from('personnel').delete().neq('id', '0');
                 const records = [];
-                Object.entries(data).forEach(([catId, list]) => {
-                    list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name }));
-                });
+                Object.entries(data).forEach(([catId, list]) => list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name })));
                 if(records.length) await supabase.from('personnel').insert(records);
             }
             else if (table === 'courses') {
@@ -418,7 +416,6 @@
               newPersonnel[currentCatId] = newPersonnel[currentCatId].filter(p => p.id !== empId);
               if (!newPersonnel[targetCatId]) newPersonnel[targetCatId] = [];
               newPersonnel[targetCatId] = [...newPersonnel[targetCatId], personObj];
-              
               setPersonnel(newPersonnel);
               syncDB('personnel', newPersonnel);
           }
@@ -432,10 +429,9 @@
           else newData[empId][date] = { status, context };
           
           setAttendanceData(newData);
+          setSyncStatus('同步中...');
           
-          if (status) {
-              movePersonToCategory(empId, status);
-          }
+          if (status) movePersonToCategory(empId, status);
           
           try {
             if (!status) {
@@ -444,9 +440,7 @@
                 await supabase.from('attendance').upsert({ employee_id: empId, date: date, status: status, context: context }, { onConflict: 'employee_id, date' });
             }
             setSyncStatus('✅ 已同步');
-          } catch(e) {
-            setSyncStatus('❌ 儲存失敗');
-          }
+          } catch(e) { setSyncStatus('❌ 儲存失敗'); }
       };
       
       const batchUpdateAttendance = async (records) => {
@@ -467,10 +461,7 @@
              const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id, date' });
              if (error) throw error;
              setSyncStatus('✅ 批量完成');
-          } catch(e) {
-             console.error(e);
-             setSyncStatus('❌ 批量失敗');
-          }
+          } catch(e) { console.error(e); setSyncStatus('❌ 批量失敗'); }
       };
 
       // --- Handlers ---
@@ -524,7 +515,6 @@
           syncDB('personnel', newPersonnel);
           setShowDeleteModal(false);
       };
-      
       const onDragStart = (e, person, fromCategory) => {
           setDraggedItem({ person, fromCategory });
           e.dataTransfer.effectAllowed = 'move';
@@ -657,6 +647,171 @@
         return Math.floor(diff / oneDay);
       };
 
+      // --- Views (Inline Definition) ---
+      
+      const WorkScheduleView = (
+              <div className="fade-in space-y-4 pb-20">
+                  <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+                      <div className="flex items-center gap-4">
+                          <button onClick={() => handleWsChangeMonth(-1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronLeft /></button>
+                          <div className="text-lg font-bold text-slate-100 min-w-[120px] text-center">{wsTitle}</div>
+                          <button onClick={() => handleWsChangeMonth(1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronRight /></button>
+                      </div>
+                      <div className="flex gap-2">
+                          <button onClick={() => setWsViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'week' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>週檢視</button>
+                          <button onClick={() => setWsViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>月檢視</button>
+                      </div>
+                      <div className="flex items-center gap-4">
+                           <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md shadow-indigo-900/50"><Icons.Plus /> 新增紀錄</button>
+                           <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"><Icons.Search /><input className="bg-transparent border-none outline-none text-sm w-32 text-slate-200" placeholder="搜尋姓名..." value={wsSearchTerm} onChange={e => setWsSearchTerm(e.target.value)} /></div>
+                           <div className="flex gap-4 text-xs font-medium text-slate-400">
+                               <span>今日工作: <span className="text-blue-400 font-bold">{dailyStats.workingToday}</span></span>
+                               <span>休假: <span className="text-rose-400 font-bold">{dailyStats.leaveToday}</span></span>
+                           </div>
+                      </div>
+                  </div>
+
+                  <div className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden relative ${wsViewMode === 'month' ? 'view-month' : ''}`}>
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse table-fixed">
+                              <thead>
+                                  <tr>
+                                      <th className="sticky left-0 bg-slate-900 z-20 border-b border-r border-slate-800 p-3 w-[150px] text-left font-bold text-slate-300">人員</th>
+                                      {datesToShow.map(d => {
+                                          const dayName = ['日','一','二','三','四','五','六'][d.getDay()];
+                                          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                          return (
+                                              <th key={d.toISOString()} className={`border-b border-r border-slate-800 p-1 text-center font-medium ${isWeekend ? 'bg-slate-800/50 text-rose-300' : 'text-slate-400'}`} style={{width: wsViewMode==='week' ? '12%' : '36px'}}>
+                                                  <div className="text-[10px]">{d.getMonth()+1}/{d.getDate()}</div>
+                                                  <div className="text-[9px]">({dayName})</div>
+                                              </th>
+                                          );
+                                      })}
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  {wsFilteredGroups.map(group => (
+                                      <React.Fragment key={group.name}>
+                                          <tr className="bg-slate-800/50 cursor-pointer hover:bg-slate-800" onClick={() => setWsExpandedGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
+                                              <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 font-bold text-indigo-400 pl-4 flex items-center gap-2" colSpan={datesToShow.length + 1}>{wsExpandedGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>} {group.name}</td>
+                                          </tr>
+                                          {wsExpandedGroups[group.name] && group.items.map(cat => (
+                                              cat.people.map(p => (
+                                                  <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
+                                                      <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 pl-6 font-medium text-slate-300 shadow-sm"><div className="flex items-center justify-between"><span>{p.name}</span><span className="text-[9px] text-slate-400 bg-slate-800 px-1 rounded border border-slate-700">{cat.label}</span></div></td>
+                                                      {datesToShow.map(d => {
+                                                          const dateStr = d.toISOString().split('T')[0];
+                                                          const record = attendanceData[p.id]?.[dateStr];
+                                                          const statusConfig = TASK_TYPES.find(t => t.id === record?.status);
+                                                          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                                          return (
+                                                              <td key={dateStr} onClick={(e) => handleWsCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''}`}>
+                                                                  {statusConfig ? (
+                                                                      <div className={`task-block ${statusConfig.color}`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
+                                                                          {wsViewMode === 'week' ? (record.context || statusConfig.label) : (record.context ? record.context.substring(0,2) : statusConfig.label.substring(0,1))}
+                                                                      </div>
+                                                                  ) : <div className="w-full h-full opacity-0 hover:opacity-100 text-slate-600 text-[10px] flex items-center justify-center">+</div>}
+                                                              </td>
+                                                          );
+                                                      })}
+                                                  </tr>
+                                              ))
+                                          ))}
+                                      </React.Fragment>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                      {/* Popover */}
+                      {wsPopover && (
+                          <div className="fixed z-50 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: wsPopover.y + 5, left: Math.min(wsPopover.x - 60, window.innerWidth - 200) }}>
+                              <input type="text" placeholder="工作內容..." className="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 mb-1 outline-none focus:border-indigo-500 text-slate-200" autoFocus value={wsPopoverContext} onChange={e => setWsPopoverContext(e.target.value)} />
+                              <div className="grid grid-cols-2 gap-1.5">{TASK_TYPES.map(type => (<button key={type.id} onClick={() => handleWsSaveCell(type.id)} className={`text-[10px] px-2 py-1.5 rounded text-center font-bold shadow-sm ${type.color} opacity-90 hover:opacity-100`}>{type.label}</button>))}</div>
+                              <div className="h-px bg-slate-700 my-1"></div>
+                              <button onClick={() => handleWsSaveCell(null)} className="text-xs px-2 py-1.5 rounded text-center font-medium text-slate-400 hover:bg-slate-700 w-full">清除紀錄</button>
+                              <div className="fixed inset-0 z-[-1]" onClick={() => setWsPopover(null)}></div>
+                          </div>
+                      )}
+                  </div>
+                  {/* Batch Modal */}
+                  {wsShowBatchModal && (
+                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                          <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-800">
+                              <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增紀錄</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
+                              <div className="space-y-4">
+                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">人員</label><select className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" value={wsBatchForm.personId} onChange={e => setWsBatchForm({...wsBatchForm, personId: e.target.value})}><option value="">請選擇...</option>{categoryGroups.map(g => (<optgroup key={g.name} label={g.name}>{g.items.map(cat => personnel[cat.id]?.map(p => <option key={p.id} value={p.id}>{p.name} ({cat.label})</option>))}</optgroup>))}</select></div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                      <div><label className="block text-xs font-bold text-slate-400 mb-1">開始</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.startDate} onChange={e => setWsBatchForm({...wsBatchForm, startDate: e.target.value})} /></div>
+                                      <div><label className="block text-xs font-bold text-slate-400 mb-1">結束</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.endDate} onChange={e => setWsBatchForm({...wsBatchForm, endDate: e.target.value})} /></div>
+                                  </div>
+                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">類型</label><div className="flex flex-wrap gap-2">{TASK_TYPES.map(t => (<button key={t.id} onClick={() => setWsBatchForm({...wsBatchForm, type: t.id})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shadow-sm ${wsBatchForm.type === t.id ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-80 border-transparent'} ${t.color}`}>{t.label}</button>))}</div></div>
+                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">內容/備註</label><input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" placeholder="S1助教、備課..." value={wsBatchForm.context} onChange={e => setWsBatchForm({...wsBatchForm, context: e.target.value})} /></div>
+                                  <button onClick={handleWsBatchSubmit} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg mt-2">確認</button>
+                              </div>
+                          </div>
+                      </div>
+                  )}
+              </div>
+      );
+      
+      const TimelineView = (
+            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto fade-in">
+                <div className="min-w-[800px]">
+                    <div className="flex items-center justify-between mb-4 px-2">
+                        <button onClick={() => setTimelineYear(y => y - 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>
+                        <h2 className="text-lg font-bold text-slate-100">{timelineYear} 年課程時間軸</h2>
+                        <button onClick={() => setTimelineYear(y => y + 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronRight /></button>
+                    </div>
+                    <div className="flex border-b border-slate-800 pb-2 mb-2 sticky top-0 bg-slate-900 z-10">
+                        {Array.from({length: 12}, (_, i) => i + 1).map(m => (<div key={m} className="flex-1 text-center text-xs font-bold text-slate-400 border-r border-slate-800 last:border-0">{m}月</div>))}
+                    </div>
+                    <div className="space-y-3 relative h-[500px] overflow-y-auto">
+                        <div className="absolute inset-0 flex pointer-events-none z-0">
+                             {Array.from({length: 12}, (_, i) => i + 1).map(m => <div key={m} className="flex-1 border-r border-slate-800 last:border-0 h-full"></div>)}
+                        </div>
+                        {masterCourses.length === 0 && <div className="text-center text-slate-600 py-10">尚無課程資料</div>}
+                        {masterCourses.sort((a,b) => new Date(a.startDate) - new Date(b.startDate)).map(course => {
+                            if (!course.startDate || !course.endDate) return null;
+                            const start = new Date(course.startDate);
+                            const end = new Date(course.endDate);
+                            if (start.getFullYear() !== timelineYear && end.getFullYear() !== timelineYear) return null;
+                            const yearStart = new Date(timelineYear, 0, 1).getTime();
+                            const yearEnd = new Date(timelineYear, 11, 31).getTime();
+                            const yearDuration = yearEnd - yearStart;
+                            const cStart = Math.max(start.getTime(), yearStart);
+                            const cEnd = Math.min(end.getTime(), yearEnd);
+                            if (cEnd < cStart) return null;
+                            const left = ((cStart - yearStart) / yearDuration) * 100;
+                            const width = ((cEnd - cStart) / yearDuration) * 100;
+                            
+                            const getCourseColor = (type) => {
+                              if (type === 'regular') return 'bg-blue-600 text-white';
+                              if (type === 'sketch') return 'bg-orange-600 text-white';
+                              if (type === 'camp30') return 'bg-emerald-600 text-white';
+                              return 'bg-slate-600 text-white';
+                            };
+
+                            return (
+                                <div key={course.id} className="relative h-8 z-10 hover:z-20 group">
+                                    <div className={`absolute h-6 rounded-md shadow-sm text-[10px] flex items-center px-2 cursor-pointer transition-all hover:scale-105 ${getCourseColor(course.type)}`}
+                                        style={{ left: `${left}%`, width: `${width}%`, minWidth: '40px' }}
+                                        title={`${course.name} (${course.startDate} ~ ${course.endDate})`}>
+                                        <span className="truncate font-bold">{course.name} {course.batch && `(${course.batch})`}</span>
+                                        <div className="hidden group-hover:block absolute bottom-full left-0 mb-1 bg-slate-900 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap z-50 border border-slate-700">
+                                            <div className="font-bold text-sm">{course.name}</div>
+                                            <div>期數: {course.batch || '-'}</div>
+                                            <div>日期: {course.startDate} ~ {course.endDate}</div>
+                                            <div>人數: {course.students}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+      );
+
       if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-400 font-medium">載入中...</div>;
 
       return (
@@ -671,17 +826,22 @@
                 <button onClick={() => setCurrentView('attendance')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'attendance' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.ClipboardCheck /> <span className="hidden md:inline">工作班表</span></button>
                 <button onClick={() => setCurrentView('timeline')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'timeline' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Calendar /> <span className="hidden md:inline">課程時間軸</span></button>
                 <button onClick={() => setCurrentView('personnel')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'personnel' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Users /> <span className="hidden md:inline">人員名單</span></button>
-                <div className="hidden md:block mt-auto pt-6 border-t border-slate-800"><div className="flex items-center gap-2 text-xs font-bold text-slate-500 px-4"><Icons.Cloud /> <span>{syncStatus}</span></div></div>
+                <div className="hidden md:block mt-auto pt-6 border-t border-slate-800">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 px-4 mb-2"><Icons.Cloud /> <span>{syncStatus}</span></div>
+                    <button onClick={() => setForceRefresh(p=>p+1)} className="w-full text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 py-2 rounded text-center">重新整理</button>
+                </div>
             </nav>
 
             <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen bg-slate-950">
                 {currentView === 'dashboard' && (
                     <div className="space-y-8 fade-in">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* KPI & Dashboard Content (Same as before) */}
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <KPICard title="助教總人數" value={stats.total} icon={<Icons.Users />} color="bg-slate-800 text-slate-400" />
                             <KPICard title="目前已分配" value={stats.allocated} icon={<div className="w-2 h-2 rounded-full bg-emerald-500"></div>} color="bg-emerald-900/50 text-emerald-400" />
                             <KPICard title="總學生數" value={studentStats.total} icon={<div className="w-2 h-2 rounded-full bg-indigo-500"></div>} color="bg-indigo-900/50 text-indigo-400" />
                         </div>
+                        {/* ... Rest of Dashboard ... */}
                         <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
                             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                                 <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
@@ -689,7 +849,7 @@
                             </div>
                             <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程，請點擊右上角新增。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} />)}</tbody></table></div>
                         </div>
-                        <div>
+                         <div>
                             <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {schedule.map((m, idx) => (
@@ -730,112 +890,8 @@
                     </div>
                 )}
 
-                {currentView === 'attendance' && (
-                    <div className="fade-in space-y-4 pb-20">
-                        <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => handleWsChangeMonth(-1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronLeft /></button>
-                                <div className="text-lg font-bold text-slate-100 min-w-[120px] text-center">{wsTitle}</div>
-                                <button onClick={() => handleWsChangeMonth(1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronRight /></button>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setWsViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'week' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>週檢視</button>
-                                <button onClick={() => setWsViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>月檢視</button>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md shadow-indigo-900/50"><Icons.Plus /> 新增紀錄</button>
-                                <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"><Icons.Search /><input className="bg-transparent border-none outline-none text-sm w-32 text-slate-200" placeholder="搜尋姓名..." value={wsSearchTerm} onChange={e => setWsSearchTerm(e.target.value)} /></div>
-                                <div className="flex gap-4 text-xs font-medium text-slate-400">
-                                    <span>今日工作: <span className="text-blue-400 font-bold">{dailyStats.workingToday}</span></span>
-                                    <span>休假: <span className="text-rose-400 font-bold">{dailyStats.leaveToday}</span></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden relative ${wsViewMode === 'month' ? 'view-month' : ''}`}>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs border-collapse table-fixed">
-                                    <thead>
-                                        <tr>
-                                            <th className="sticky left-0 bg-slate-900 z-20 border-b border-r border-slate-800 p-3 w-[150px] text-left font-bold text-slate-300">人員</th>
-                                            {datesToShow.map(d => {
-                                                const dayName = ['日','一','二','三','四','五','六'][d.getDay()];
-                                                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                                return (
-                                                    <th key={d.toISOString()} className={`border-b border-r border-slate-800 p-1 text-center font-medium ${isWeekend ? 'bg-slate-800/50 text-rose-300' : 'text-slate-400'}`} style={{width: wsViewMode==='week' ? '12%' : '36px'}}>
-                                                        <div className="text-[10px]">{d.getMonth()+1}/{d.getDate()}</div>
-                                                        <div className="text-[9px]">({dayName})</div>
-                                                    </th>
-                                                );
-                                            })}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {wsFilteredGroups.map(group => (
-                                            <React.Fragment key={group.name}>
-                                                <tr className="bg-slate-800/50 cursor-pointer hover:bg-slate-800" onClick={() => setWsExpandedGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
-                                                    <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 font-bold text-indigo-400 pl-4 flex items-center gap-2" colSpan={datesToShow.length + 1}>{wsExpandedGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>} {group.name}</td>
-                                                </tr>
-                                                {wsExpandedGroups[group.name] && group.items.map(cat => (
-                                                    cat.people.map(p => (
-                                                        <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
-                                                            <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 pl-6 font-medium text-slate-300 shadow-sm"><div className="flex items-center justify-between"><span>{p.name}</span><span className="text-[9px] text-slate-400 bg-slate-800 px-1 rounded border border-slate-700">{cat.label}</span></div></td>
-                                                            {datesToShow.map(d => {
-                                                                const dateStr = d.toISOString().split('T')[0];
-                                                                const record = attendanceData[p.id]?.[dateStr];
-                                                                const statusConfig = TASK_TYPES.find(t => t.id === record?.status);
-                                                                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                                                return (
-                                                                    <td key={dateStr} onClick={(e) => handleWsCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''}`}>
-                                                                        {statusConfig ? (
-                                                                            <div className={`task-block ${statusConfig.color}`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
-                                                                                {wsViewMode === 'week' ? (record.context || statusConfig.label) : (record.context ? record.context.substring(0,2) : statusConfig.label.substring(0,1))}
-                                                                            </div>
-                                                                        ) : <div className="w-full h-full opacity-0 hover:opacity-100 text-slate-600 text-[10px] flex items-center justify-center">+</div>}
-                                                                    </td>
-                                                                );
-                                                            })}
-                                                        </tr>
-                                                    ))
-                                                ))}
-                                            </React.Fragment>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            {/* Popover */}
-                            {wsPopover && (
-                                <div className="fixed z-50 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: wsPopover.y + 5, left: Math.min(wsPopover.x - 60, window.innerWidth - 200) }}>
-                                    <input type="text" placeholder="工作內容..." className="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 mb-1 outline-none focus:border-indigo-500 text-slate-200" autoFocus value={wsPopoverContext} onChange={e => setWsPopoverContext(e.target.value)} />
-                                    <div className="grid grid-cols-2 gap-1.5">{TASK_TYPES.map(type => (<button key={type.id} onClick={() => handleWsSaveCell(type.id)} className={`text-[10px] px-2 py-1.5 rounded text-center font-bold shadow-sm ${type.color} opacity-90 hover:opacity-100`}>{type.label}</button>))}</div>
-                                    <div className="h-px bg-slate-700 my-1"></div>
-                                    <button onClick={() => handleWsSaveCell(null)} className="text-xs px-2 py-1.5 rounded text-center font-medium text-slate-400 hover:bg-slate-700 w-full">清除紀錄</button>
-                                    <div className="fixed inset-0 z-[-1]" onClick={() => setWsPopover(null)}></div>
-                                </div>
-                            )}
-                        </div>
-                        
-                        {/* Batch Modal */}
-                        {wsShowBatchModal && (
-                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                                <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-800">
-                                    <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增紀錄</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
-                                    <div className="space-y-4">
-                                        <div><label className="block text-xs font-bold text-slate-400 mb-1">人員</label><select className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" value={wsBatchForm.personId} onChange={e => setWsBatchForm({...wsBatchForm, personId: e.target.value})}><option value="">請選擇...</option>{categoryGroups.map(g => (<optgroup key={g.name} label={g.name}>{g.items.map(cat => personnel[cat.id]?.map(p => <option key={p.id} value={p.id}>{p.name} ({cat.label})</option>))}</optgroup>))}</select></div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-xs font-bold text-slate-400 mb-1">開始</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.startDate} onChange={e => setWsBatchForm({...wsBatchForm, startDate: e.target.value})} /></div>
-                                            <div><label className="block text-xs font-bold text-slate-400 mb-1">結束</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.endDate} onChange={e => setWsBatchForm({...wsBatchForm, endDate: e.target.value})} /></div>
-                                        </div>
-                                        <div><label className="block text-xs font-bold text-slate-400 mb-1">類型</label><div className="flex flex-wrap gap-2">{TASK_TYPES.map(t => (<button key={t.id} onClick={() => setWsBatchForm({...wsBatchForm, type: t.id})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shadow-sm ${wsBatchForm.type === t.id ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-80 border-transparent'} ${t.color}`}>{t.label}</button>))}</div></div>
-                                        <div><label className="block text-xs font-bold text-slate-400 mb-1">內容/備註</label><input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" placeholder="S1助教、備課..." value={wsBatchForm.context} onChange={e => setWsBatchForm({...wsBatchForm, context: e.target.value})} /></div>
-                                        <button onClick={handleWsBatchSubmit} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg mt-2">確認</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
+                {currentView === 'attendance' && WorkScheduleView}
+                
                 {currentView === 'personnel' && (
                     <div className="fade-in max-w-5xl mx-auto">
                         <div className="flex justify-between items-end mb-6">
@@ -876,7 +932,8 @@
                         </div>
                     </div>
                 )}
-                {currentView === 'timeline' && <TimelineView />}
+                
+                {currentView === 'timeline' && TimelineView}
             </main>
 
             {/* Modals */}
