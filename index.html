@@ -175,6 +175,7 @@
     );
 
     const App = () => {
+      // --- State ---
       const [loading, setLoading] = useState(true);
       const [syncStatus, setSyncStatus] = useState('連線中...');
       const [currentView, setCurrentView] = useState('dashboard');
@@ -595,6 +596,7 @@
           syncDB('personnel', newPersonnel);
           setShowDeleteModal(false);
       };
+      
       const onDragStart = (e, person, fromCategory) => {
           setDraggedItem({ person, fromCategory });
           e.dataTransfer.effectAllowed = 'move';
@@ -1033,7 +1035,7 @@
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="col-span-1"><label className="block text-xs font-bold text-slate-400 mb-1">開始日期</label><input type="date" value={newCourse.startDate} onChange={e => setNewCourse({...newCourse, startDate:e.target.value, endDate: calculateEndDate(e.target.value, newCourse.duration)})} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" /></div>
                                 <div className="col-span-1"><label className="block text-xs font-bold text-slate-500 mb-1">天數</label><input type="number" value={newCourse.duration} onChange={e => setNewCourse({...newCourse, duration:e.target.value, endDate: calculateEndDate(newCourse.startDate, e.target.value)})} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" /></div>
-                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-400 mb-1">結束日期 (自動)</label><input type="date" value={newCourse.endDate} readOnly className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-600 outline-none cursor-not-allowed" /></div>
+                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-500 mb-1">結束日期 (自動)</label><input type="date" value={newCourse.endDate} readOnly className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-600 outline-none cursor-not-allowed" /></div>
                             </div>
                             <div><label className="block text-xs font-bold text-slate-400 mb-1">預估人數</label><input type="number" value={newCourse.students} onChange={e => setNewCourse({...newCourse, students:parseInt(e.target.value)||0})} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-400" placeholder="0" /></div>
                             {errorMsg && <div className="text-rose-400 text-xs font-bold bg-rose-900/30 p-2 rounded">{errorMsg}</div>}
