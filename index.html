@@ -184,241 +184,6 @@
         );
     };
 
-    const ProjectManagementView = ({ personnel, allPersonnelList, masterCourses, projects, setProjects, projectTasks, setProjectTasks, onAssignPerson, onDeleteCourse }) => {
-        const [selectedProject, setSelectedProject] = useState(null);
-        const [showAddProjectModal, setShowAddProjectModal] = useState(false);
-        const [newProj, setNewProj] = useState({ name: '', description: '', status: 'planning', start_date: '', end_date: '' });
-        const [newTask, setNewTask] = useState({ title: '', assignee_id: '', status: 'todo' });
-        const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'gantt'
-        const [ganttYear, setGanttYear] = useState(new Date().getFullYear());
-
-        const combinedProjects = useMemo(() => {
-            const coursesAsProjects = masterCourses.map(c => ({
-                id: c.id,
-                name: `${c.name} ${c.batch || ''}`.trim(),
-                description: `課程天數: ${c.duration}天 | 預估人數: ${c.students}人`,
-                status: 'active',
-                start_date: c.startDate,
-                end_date: c.endDate,
-                isCourse: true,
-                type: c.type
-            }));
-            const customProjects = projects.map(p => ({
-                ...p,
-                isCourse: false
-            }));
-            return [...coursesAsProjects, ...customProjects].sort((a,b) => new Date(a.start_date||0) - new Date(b.start_date||0));
-        }, [masterCourses, projects]);
-
-        const handleCreateProject = async () => {
-            if (!newProj.name) return;
-            const p = { ...newProj, id: generateId(), status: 'planning' };
-            setProjects(prev => [...prev, p]); // Optimistic update
-            setShowAddProjectModal(false);
-            setNewProj({ name: '', description: '', status: 'planning', start_date: '', end_date: '' });
-            await supabase.from('projects').insert(p);
-        };
-
-        const handleAddTask = async () => {
-            if (!newTask.title || !selectedProject) return;
-            const t = { ...newTask, id: generateId(), project_id: selectedProject.id };
-            
-            setProjectTasks(prev => [...prev, t]); // Optimistic update
-            
-            // Automatically move person to "Project" category if assigned
-            if (newTask.assignee_id) {
-                onAssignPerson(newTask.assignee_id, 'project'); 
-            }
-
-            setNewTask({ title: '', assignee_id: '', status: 'todo' });
-            await supabase.from('project_tasks').insert(t);
-        };
-
-        const handleTaskStatusChange = async (taskId, newStatus) => {
-            setProjectTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-            await supabase.from('project_tasks').update({ status: newStatus }).eq('id', taskId);
-        };
-
-        const handleDeleteTask = async (taskId) => {
-            if(!confirm('刪除任務?')) return;
-            setProjectTasks(prev => prev.filter(t => t.id !== taskId));
-            await supabase.from('project_tasks').delete().eq('id', taskId);
-        };
-
-        const handleDeleteProject = async (projId) => {
-             if(!confirm('刪除專案及其所有任務?')) return;
-             setProjects(prev => prev.filter(p => p.id !== projId));
-             setProjectTasks(prev => prev.filter(t => t.project_id !== projId));
-             if(selectedProject && selectedProject.id === projId) setSelectedProject(null);
-             
-             await supabase.from('projects').delete().eq('id', projId);
-             await supabase.from('project_tasks').delete().eq('project_id', projId);
-        };
-
-        const activeProjectTasks = projectTasks.filter(t => selectedProject && t.project_id === selectedProject.id);
-
-        const renderGantt = () => {
-            const months = Array.from({length: 12}, (_, i) => i + 1);
-            const getProjColor = (p) => {
-                if (!p.isCourse) return 'bg-purple-600 text-white';
-                if (p.type === 'regular') return 'bg-blue-600 text-white';
-                if (p.type === 'sketch') return 'bg-orange-600 text-white';
-                if (p.type === 'camp30') return 'bg-emerald-600 text-white';
-                return 'bg-slate-600 text-white';
-            };
-
-            return (
-                <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto fade-in">
-                    <div className="min-w-[800px]">
-                        <div className="flex items-center justify-between mb-4 px-2">
-                            <button onClick={() => setGanttYear(y => y - 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>
-                            <h2 className="text-lg font-bold text-slate-100">{ganttYear} 年專案與課程甘特圖</h2>
-                            <button onClick={() => setGanttYear(y => y + 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronRight /></button>
-                        </div>
-                        <div className="flex border-b border-slate-800 pb-2 mb-2 sticky top-0 bg-slate-900 z-10">
-                            {months.map(m => (<div key={m} className="flex-1 text-center text-xs font-bold text-slate-400 border-r border-slate-800 last:border-0">{m}月</div>))}
-                        </div>
-                        <div className="space-y-3 relative h-[500px] overflow-y-auto">
-                            <div className="absolute inset-0 flex pointer-events-none z-0">{months.map(m => <div key={m} className="flex-1 border-r border-slate-800 last:border-0 h-full"></div>)}</div>
-                            {combinedProjects.length === 0 && <div className="text-center text-slate-600 py-10">尚無專案或課程資料</div>}
-                            {combinedProjects.map(proj => {
-                                if (!proj.start_date || !proj.end_date) return null;
-                                const start = new Date(proj.start_date);
-                                const end = new Date(proj.end_date);
-                                if (start.getFullYear() !== ganttYear && end.getFullYear() !== ganttYear) return null;
-                                const yearStart = new Date(ganttYear, 0, 1).getTime();
-                                const yearEnd = new Date(ganttYear, 11, 31).getTime();
-                                const duration = yearEnd - yearStart;
-                                const cStart = Math.max(start.getTime(), yearStart);
-                                const cEnd = Math.min(end.getTime(), yearEnd);
-                                if (cEnd < cStart) return null;
-                                const left = ((cStart - yearStart) / duration) * 100;
-                                const width = ((cEnd - cStart) / duration) * 100;
-                                return (
-                                    <div key={proj.id} className="relative h-8 z-10 hover:z-20 group">
-                                        <div className={`absolute h-6 rounded-md shadow-sm text-[10px] flex items-center px-2 cursor-pointer transition-all hover:scale-105 ${getProjColor(proj)}`} style={{ left: `${left}%`, width: `${width}%`, minWidth: '40px' }} title={proj.name}>
-                                            <span className="truncate font-bold">
-                                                {proj.isCourse ? '📚 ' : '💼 '} {proj.name}
-                                            </span>
-                                            <div className="hidden group-hover:block absolute bottom-full left-0 mb-1 bg-slate-900 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap z-50 border border-slate-700">
-                                                <div className="font-bold text-sm">{proj.name}</div>
-                                                <div>{proj.isCourse ? '課程' : '專案'}</div>
-                                                <div>日期: {proj.start_date} ~ {proj.end_date}</div>
-                                                <div>{proj.description}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        return (
-            <div className="fade-in space-y-6 pb-20">
-                <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-2xl font-black text-slate-100">專案管理</h2>
-                        <div className="flex bg-slate-800 rounded-lg p-1">
-                            <button onClick={() => setViewMode('kanban')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>看板模式</button>
-                            <button onClick={() => setViewMode('gantt')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'gantt' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>甘特圖</button>
-                        </div>
-                    </div>
-                    {viewMode === 'kanban' && <button onClick={() => setShowAddProjectModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-lg"><Icons.Plus /> 新增專案</button>}
-                </div>
-                
-                {viewMode === 'gantt' ? renderGantt() : (
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        <div className="lg:col-span-1 space-y-3 overflow-y-auto max-h-[80vh] custom-scrollbar pr-2">
-                            {combinedProjects.map(p => (
-                                <div key={p.id} onClick={() => setSelectedProject(p)} className={`p-4 rounded-xl border cursor-pointer transition-all relative group ${selectedProject?.id === p.id ? 'bg-indigo-900/50 border-indigo-500' : 'bg-slate-900 border-slate-800 hover:border-slate-600'}`}>
-                                    <h3 className="font-bold text-slate-200 flex items-center gap-2">
-                                        <span className="text-base">{p.isCourse ? '📚' : '💼'}</span> {p.name}
-                                    </h3>
-                                    <div className="flex justify-between mt-2">
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.isCourse ? 'bg-blue-900 text-blue-400' : (p.status==='active'?'bg-emerald-900 text-emerald-400':'bg-slate-700 text-slate-400')}`}>{p.isCourse ? '課程' : (p.status==='active'?'進行中':'規劃中')}</span>
-                                        <span className="text-xs text-slate-500">{projectTasks.filter(t => t.project_id === p.id).length} 任務</span>
-                                    </div>
-                                    <button onClick={(e) => { e.stopPropagation(); if(p.isCourse) { onDeleteCourse(p.id); if(selectedProject?.id === p.id) setSelectedProject(null); } else { handleDeleteProject(p.id); } }} className="absolute top-2 right-2 text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
-                                </div>
-                            ))}
-                            {combinedProjects.length === 0 && <div className="text-slate-500 text-center text-sm">暫無專案</div>}
-                        </div>
-                        <div className="lg:col-span-3">
-                            {selectedProject ? (
-                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 h-full flex flex-col">
-                                    <div className="flex justify-between items-start mb-6 border-b border-slate-700 pb-4">
-                                        <div><h2 className="text-xl font-bold text-white flex items-center gap-2"><span className="text-2xl">{selectedProject.isCourse ? '📚' : '💼'}</span> {selectedProject.name}</h2><p className="text-sm text-slate-400 mt-1">{selectedProject.description}</p></div>
-                                        <div className="flex gap-2">
-                                            <input className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 outline-none" placeholder="新任務..." value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
-                                            <select className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-300 outline-none" value={newTask.assignee_id} onChange={e => setNewTask({...newTask, assignee_id: e.target.value})}>
-                                                <option value="">指派人員...</option>
-                                                {allPersonnelList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                            </select>
-                                            <button onClick={handleAddTask} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-700 whitespace-nowrap">新增</button>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-4 flex-1">
-                                        {['todo', 'doing', 'done'].map(status => (
-                                            <div key={status} className="bg-slate-950/50 rounded-lg p-3">
-                                                <div className="text-xs font-bold text-slate-400 uppercase mb-3 flex justify-between">
-                                                    <span>{status === 'todo' ? '待辦' : status === 'doing' ? '進行中' : '已完成'}</span>
-                                                    <span className="bg-slate-800 px-1.5 rounded text-slate-500">{activeProjectTasks.filter(t => t.status === status).length}</span>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {activeProjectTasks.filter(t => t.status === status).map(task => (
-                                                        <div key={task.id} className="bg-slate-800 p-3 rounded border border-slate-700 hover:border-slate-600 group">
-                                                            <div className="text-sm text-slate-200 font-medium mb-2">{task.title}</div>
-                                                            <div className="flex justify-between items-center">
-                                                                {task.assignee_id ? <span className="text-[10px] bg-indigo-900 text-indigo-300 px-1.5 py-0.5 rounded">{allPersonnelList.find(p => p.id === task.assignee_id)?.name || '未知'}</span> : <span className="text-[10px] text-slate-600">未指派</span>}
-                                                                <div className="flex gap-2">
-                                                                    <select className="bg-transparent text-[10px] text-slate-500 outline-none cursor-pointer hover:text-slate-300" value={task.status} onChange={(e) => handleTaskStatusChange(task.id, e.target.value)}>
-                                                                        <option value="todo">待辦</option>
-                                                                        <option value="doing">進行</option>
-                                                                        <option value="done">完成</option>
-                                                                    </select>
-                                                                    <button onClick={() => handleDeleteTask(task.id)} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Icons.Trash /></button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-500 bg-slate-900/50 rounded-xl border border-dashed border-slate-800">請從左側選擇一個專案以查看詳情</div>}
-                        </div>
-                    </div>
-                )}
-                {showAddProjectModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-                        <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-800">
-                            <h3 className="text-xl font-bold text-slate-100 mb-4">新增專案</h3>
-                            <div className="space-y-3">
-                                <input className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500" placeholder="專案名稱" value={newProj.name} onChange={e => setNewProj({...newProj, name: e.target.value})} />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs text-slate-400 mb-1">開始日期</label>
-                                        <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none" value={newProj.start_date} onChange={e => setNewProj({...newProj, start_date: e.target.value})} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-slate-400 mb-1">結束日期</label>
-                                        <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none" value={newProj.end_date} onChange={e => setNewProj({...newProj, end_date: e.target.value})} />
-                                    </div>
-                                </div>
-                                <textarea className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500 h-24 resize-none" placeholder="描述..." value={newProj.description} onChange={e => setNewProj({...newProj, description: e.target.value})} />
-                                <div className="flex gap-2 justify-end mt-4"><button onClick={() => setShowAddProjectModal(false)} className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-slate-300 transition-colors">取消</button><button onClick={handleCreateProject} className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">建立</button></div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     const WorkScheduleView = ({ personnel, categoryGroups, attendanceData, onUpdateAttendance, onBatchUpdate, taskTypes, setShowTaskTypeModal, wsSearchTerm, setWsSearchTerm, dailyStats, wsShowBatchModal, setWsShowBatchModal, wsBatchForm, setWsBatchForm }) => {
         const [selectedMonth, setSelectedMonth] = useState(new Date());
         const [viewMode, setViewMode] = useState('week'); 
@@ -560,7 +325,7 @@
                                                         const statusConfig = taskTypes.find(t => t.id === record?.status);
                                                         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                                                         return (
-                                                            <td key={dateStr} onClick={(e) => handleCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''}`}>
+                                                            <td key={dateStr} onClick={(e) => handleCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''} cursor-pointer`}>
                                                                 {statusConfig ? (
                                                                     <div className={`task-block ${statusConfig.color}`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
                                                                         {viewMode === 'week' ? (record.context || statusConfig.label) : (record.context ? record.context.substring(0,2) : statusConfig.label.substring(0,1))}
@@ -833,13 +598,11 @@
         );
     };
 
-    const PersonnelView = ({ personnel, categoryGroups, setAddingToCategory, setTempName, addingToCategory, tempName, handleConfirmAddPerson, setDeleteTarget, setShowDeleteModal, onDragStart, onDragOver, onDrop, dragOverContainer, setShowCategoryModal, setCollapsedPersonnelGroups, collapsedPersonnelGroups, handleRemovePerson, projects, projectTasks, attendanceData, masterCourses, taskTypes }) => {
-        const [selectedPersonTasks, setSelectedPersonTasks] = useState(null);
-
+    const PersonnelView = ({ personnel, categoryGroups, setAddingToCategory, setTempName, addingToCategory, tempName, handleConfirmAddPerson, setDeleteTarget, setShowDeleteModal, onDragStart, onDragOver, onDrop, dragOverContainer, setShowCategoryModal, setCollapsedPersonnelGroups, collapsedPersonnelGroups }) => {
         return (
             <div className="fade-in max-w-5xl mx-auto space-y-6 pb-20">
                 <div className="flex justify-between items-end mb-6">
-                    <div><h2 className="text-2xl font-black text-slate-100">人員名單管理</h2><p className="text-sm text-slate-500 mt-1">拖曳卡片以調整職位，點擊 + 號新增人員。點擊 📄 查看個人任務。</p></div>
+                    <div><h2 className="text-2xl font-black text-slate-100">人員名單管理</h2><p className="text-sm text-slate-500 mt-1">拖曳卡片以調整職位，點擊 + 號新增人員</p></div>
                     <div className="flex gap-2">
                         <button onClick={() => setShowCategoryModal(true)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-900 px-2 py-1 rounded">⚙️ 管理分類</button>
                         <button onClick={() => setCollapsedPersonnelGroups({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button>
@@ -862,12 +625,9 @@
                                         </div>
                                         <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                                             {personnel[cat.id]?.map(p => (
-                                                <div key={p.id} draggable onDragStart={e => onDragStart(e, p, cat.id)} className="group bg-slate-800 border border-slate-700 p-2 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-900 hover:shadow-md transition-all flex justify-between items-center">
+                                                <div key={p.id} draggable onDragStart={(e) => onDragStart(e, p, cat.id)} className="group bg-slate-800 border border-slate-700 p-2 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-900 hover:shadow-md transition-all flex justify-between items-center">
                                                     <span className="text-xs font-medium text-slate-300">{p.name}</span>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => setSelectedPersonTasks(p)} className="text-slate-500 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" title="查看個人任務"><Icons.List /></button>
-                                                        <button onClick={() => {setDeleteTarget({categoryId:cat.id, personId:p.id}); setShowDeleteModal(true);}} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
-                                                    </div>
+                                                    <button onClick={() => {setDeleteTarget({categoryId:cat.id, personId:p.id}); setShowDeleteModal(true);}} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
                                                 </div>
                                             ))}
                                             {addingToCategory === cat.id && (<div className="animate-in fade-in"><input autoFocus value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleConfirmAddPerson()} onBlur={() => tempName.trim() ? handleConfirmAddPerson() : setAddingToCategory(null)} placeholder="輸入姓名..." className="w-full text-xs p-2 border-2 border-indigo-500 bg-slate-800 text-slate-200 rounded-lg outline-none shadow-sm" /></div>)}
@@ -879,81 +639,6 @@
                         )}
                     </div>
                 ))}
-
-                {/* 個人任務 Modal */}
-                {selectedPersonTasks && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-                        <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-800 max-h-[85vh] flex flex-col animate-in zoom-in-95">
-                            <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
-                                <h3 className="text-xl font-bold text-slate-100 flex items-center gap-3">
-                                    <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-sm">{selectedPersonTasks.name}</span> 的任務清單
-                                </h3>
-                                <button onClick={() => setSelectedPersonTasks(null)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button>
-                            </div>
-                            
-                            <div className="overflow-y-auto custom-scrollbar pr-2 space-y-6 flex-1">
-                                {/* 區塊 1：專案/課程任務 */}
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">💼 進行中專案任務</h4>
-                                    <div className="space-y-2">
-                                        {projectTasks.filter(t => t.assignee_id === selectedPersonTasks.id).length > 0 ? (
-                                            projectTasks.filter(t => t.assignee_id === selectedPersonTasks.id).map(task => {
-                                                // 尋找對應的專案或課程名稱
-                                                let projName = '未知專案/課程';
-                                                const customProj = projects.find(p => p.id === task.project_id);
-                                                if (customProj) {
-                                                    projName = '💼 ' + customProj.name;
-                                                } else {
-                                                    const courseProj = masterCourses.find(c => c.id === task.project_id);
-                                                    if (courseProj) projName = '📚 ' + courseProj.name + (courseProj.batch ? ` (${courseProj.batch})` : '');
-                                                }
-
-                                                return (
-                                                    <div key={task.id} className="bg-slate-800 p-3 rounded-lg border border-slate-700 flex justify-between items-center hover:bg-slate-700/50 transition-colors">
-                                                        <div>
-                                                            <div className="text-[10px] text-slate-400 mb-1">{projName}</div>
-                                                            <div className="text-sm font-bold text-slate-200">{task.title}</div>
-                                                        </div>
-                                                        <span className={`text-[10px] px-2 py-1 rounded font-bold ${task.status === 'todo' ? 'bg-slate-700 text-slate-300' : task.status === 'doing' ? 'bg-indigo-900 text-indigo-300' : 'bg-emerald-900 text-emerald-400'}`}>
-                                                            {task.status === 'todo' ? '待辦' : task.status === 'doing' ? '進行中' : '已完成'}
-                                                        </span>
-                                                    </div>
-                                                )
-                                            })
-                                        ) : (
-                                            <div className="text-xs text-slate-500 italic py-4 text-center border border-dashed border-slate-700 rounded-lg">目前沒有分配專屬任務</div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* 區塊 2：近期班表紀錄 */}
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">📅 近期工作排班 (最新 10 筆)</h4>
-                                    <div className="space-y-2">
-                                        {Object.entries(attendanceData[selectedPersonTasks.id] || {})
-                                            .sort((a,b) => new Date(b[0]) - new Date(a[0])) // 日期降序
-                                            .slice(0, 10) 
-                                            .map(([date, record]) => {
-                                                const tConfig = taskTypes.find(t => t.id === record.status);
-                                                return (
-                                                    <div key={date} className="bg-slate-800 p-2.5 rounded-lg border border-slate-700 flex justify-between items-center hover:bg-slate-700/50 transition-colors">
-                                                        <span className="text-xs font-mono font-bold text-slate-400">{date}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs font-bold text-slate-200">{record.context || '-'}</span>
-                                                            {tConfig && <span className={`text-[10px] px-2 py-0.5 rounded shadow-sm ${tConfig.color}`}>{tConfig.label}</span>}
-                                                        </div>
-                                                    </div>
-                                                );
-                                        })}
-                                        {Object.keys(attendanceData[selectedPersonTasks.id] || {}).length === 0 && (
-                                            <div className="text-xs text-slate-500 italic py-4 text-center border border-dashed border-slate-700 rounded-lg">目前沒有班表紀錄</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         );
     };
@@ -970,9 +655,6 @@
           const [attendanceData, setAttendanceData] = useState({});
           const [masterCourses, setMasterCourses] = useState([]);
           const [schedule, setSchedule] = useState([]);
-          
-          const [projects, setProjects] = useState([]);
-          const [projectTasks, setProjectTasks] = useState([]);
           
           const [draggedItem, setDraggedItem] = useState(null);
           const [dragOverContainer, setDragOverContainer] = useState(null);
@@ -995,7 +677,6 @@
 
           const [collapsedMonths, setCollapsedMonths] = useState({});
           const [collapsedPersonnelGroups, setCollapsedPersonnelGroups] = useState({});
-          const [isMasterCollapsed, setIsMasterCollapsed] = useState(false);
           const [isScrolled, setIsScrolled] = useState(false);
           const [errorMsg, setErrorMsg] = useState('');
 
@@ -1051,8 +732,8 @@
                   } catch (e) { return []; }
               };
               try {
-                const [pData, cData, mData, attData, settingsData, projData, taskData] = await Promise.all([
-                    safeFetch('personnel'), safeFetch('courses'), safeFetch('monthly_data', { order: 'month_index' }), safeFetch('attendance'), safeFetch('app_settings'), safeFetch('projects'), safeFetch('project_tasks')
+                const [pData, cData, mData, attData, settingsData] = await Promise.all([
+                    safeFetch('personnel'), safeFetch('courses'), safeFetch('monthly_data', { order: 'month_index' }), safeFetch('attendance'), safeFetch('app_settings')
                 ]);
                 if (settingsData) {
                     const cats = settingsData.find(s => s.key === 'categories');
@@ -1076,8 +757,6 @@
                     const attMap = {}; attData.forEach(record => { if (!attMap[record.employee_id]) attMap[record.employee_id] = {}; attMap[record.employee_id][record.date] = { status: record.status, context: record.context || '' }; });
                     setAttendanceData(attMap);
                 }
-                if (projData) setProjects(projData);
-                if (taskData) setProjectTasks(taskData);
                 setSyncStatus('✅ 已同步');
               } catch (err) { setSyncStatus('⚠️ 部分功能受限'); } finally { setLoading(false); }
             };
@@ -1111,21 +790,70 @@
 
           const calculateEndDate = (startStr, days) => { if (!startStr || !days) return ''; const d = new Date(startStr); d.setDate(d.getDate() + parseInt(days) - 1); return d.toISOString().split('T')[0]; };
           const calculateDuration = (startStr, endStr) => { if (!startStr || !endStr) return 0; const s = new Date(startStr), e = new Date(endStr); if (e < s) return 0; return Math.ceil(Math.abs(e - s) / (86400000)) + 1; };
-          const syncDB = async (table, data) => { setSyncStatus('同步中...'); try { if (table === 'app_settings') { await supabase.from('app_settings').upsert(data); } else { await supabase.from(table).delete().neq('id', '0'); let records = []; if (table === 'personnel') { Object.entries(data).forEach(([catId, list]) => list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name }))); } else if (table === 'courses') { records = data.map(c => ({ id: c.id, name: c.name, type: c.type, batch: c.batch, students: c.students, start_date: c.startDate, end_date: c.endDate, duration: c.duration })); } else if (table === 'monthly_data') { records = data.map((m, i) => ({ month_index: i, students: m[0]?.students || 0 })); } if (records.length) await supabase.from(table).insert(records); } setSyncStatus('✅ 已同步'); } catch(e) { setSyncStatus('❌ 失敗'); } };
+          const syncDB = async (table, data) => { 
+              setSyncStatus('同步中...'); 
+              try { 
+                  if (table === 'app_settings') { await supabase.from('app_settings').upsert(data); } 
+                  else { 
+                      await supabase.from(table).delete().neq('id', '0'); 
+                      let records = []; 
+                      if (table === 'personnel') { Object.entries(data).forEach(([catId, list]) => list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name }))); } 
+                      else if (table === 'courses') { records = data.map(c => ({ id: c.id, name: c.name, type: c.type, batch: c.batch, students: c.students, start_date: c.startDate, end_date: c.endDate, duration: c.duration })); } 
+                      else if (table === 'monthly_data') { records = data.map((m, i) => ({ month_index: i, students: m[0]?.students || 0 })); } 
+                      if (records.length) await supabase.from(table).insert(records); 
+                  } 
+                  setSyncStatus('✅ 已同步'); 
+              } catch(e) { setSyncStatus('❌ 失敗'); } 
+          };
 
           const handleAddCourse = () => { if (!newCourse.name || !newCourse.startDate) { setErrorMsg("請填寫必要資訊"); return; } const updated = [...masterCourses, { ...newCourse, id: generateId() }]; setMasterCourses(updated); syncDB('courses', updated); setNewCourse({ ...newCourse, batch: '', students: 0, startDate: '', endDate: '' }); setShowCourseModal(false); setErrorMsg(''); };
           const handleUpdateCourse = (id, field, val) => { const updated = masterCourses.map(c => { if (c.id !== id) return c; const nc = { ...c, [field]: val }; if (field === 'startDate') nc.endDate = calculateEndDate(val, nc.duration); if (field === 'duration') nc.endDate = calculateEndDate(nc.startDate, val); if (field === 'endDate') nc.duration = calculateDuration(nc.startDate, val); return nc; }); setMasterCourses(updated); syncDB('courses', updated); };
-          const handleDeleteCourse = (id) => { if (!confirm("確定刪除？")) return; const updated = masterCourses.filter(c => c.id !== id); setMasterCourses(updated); syncDB('courses', updated); supabase.from('project_tasks').delete().eq('project_id', id).then(); };
+          const handleDeleteCourse = (id) => { if (!confirm("確定刪除？")) return; const updated = masterCourses.filter(c => c.id !== id); setMasterCourses(updated); syncDB('courses', updated); };
           const handleMonthlyChange = (mIdx, val) => { const newSched = [...schedule]; newSched[mIdx].monthly[0].students = val; setSchedule(newSched); syncDB('monthly_data', newSchedule.map(m => m.monthly)); };
           const handleConfirmAddPerson = () => { if (!tempName.trim() || !addingToCategory) return; const newP = { id: generateId(), name: tempName.trim() }; const newPersonnel = { ...personnel, [addingToCategory]: [...(personnel[addingToCategory] || []), newP] }; setPersonnel(newPersonnel); syncDB('personnel', newPersonnel); setTempName(''); setAddingToCategory(null); };
           const handleRemovePerson = () => { if (!deleteTarget) return; const newPersonnel = { ...personnel }; newPersonnel[deleteTarget.categoryId] = newPersonnel[deleteTarget.categoryId].filter(p => p.id !== deleteTarget.personId); setPersonnel(newPersonnel); syncDB('personnel', newPersonnel); setShowDeleteModal(false); };
           const onDragStart = (e, person, fromCategory) => { setDraggedItem({ person, fromCategory }); e.dataTransfer.effectAllowed = 'move'; };
           const onDragOver = (e, catId) => { e.preventDefault(); if (dragOverContainer !== catId) setDragOverContainer(catId); };
           const onDrop = (e, toCategory) => { e.preventDefault(); setDragOverContainer(null); if (!draggedItem || draggedItem.fromCategory === toCategory) return; const newPersonnel = { ...personnel }; newPersonnel[draggedItem.fromCategory] = newPersonnel[draggedItem.fromCategory].filter(p => p.id !== draggedItem.person.id); newPersonnel[toCategory] = [...(newPersonnel[toCategory] || []), draggedItem.person]; setPersonnel(newPersonnel); syncDB('personnel', newPersonnel); setDraggedItem(null); };
-          const updateAttendance = async (empId, date, status, context) => { const newData = { ...attendanceData }; if (!newData[empId]) newData[empId] = {}; if (!status) delete newData[empId][date]; else newData[empId][date] = { status, context }; setAttendanceData(newData); try { if (!status) await supabase.from('attendance').delete().match({ employee_id: empId, date: date }); else await supabase.from('attendance').upsert({ employee_id: empId, date: date, status: status, context: context }, { onConflict: 'employee_id, date' }); } catch(e) {} };
-          const batchUpdateAttendance = async (records) => { const newData = { ...attendanceData }; records.forEach(r => { if (!newData[r.employee_id]) newData[r.employee_id] = {}; newData[r.employee_id][r.date] = { status: r.status, context: r.context }; }); setAttendanceData(newData); try { await supabase.from('attendance').upsert(records, { onConflict: 'employee_id, date' }); } catch(e) {} };
+          
+          const updateAttendance = async (empId, date, status, context) => { 
+              setAttendanceData(prev => {
+                  const newData = { ...prev };
+                  if (!newData[empId]) newData[empId] = {};
+                  if (!status) delete newData[empId][date]; else newData[empId][date] = { status, context };
+                  return newData;
+              });
+              setSyncStatus('同步中...');
+              if (status) {
+                  const taskConfig = taskTypes.find(t => t.id === status);
+                  if (taskConfig && taskConfig.targetCategory) movePersonToCategory(empId, taskConfig.targetCategory);
+              }
+              try { 
+                  if (!status) await supabase.from('attendance').delete().match({ employee_id: empId, date: date }); 
+                  else await supabase.from('attendance').upsert({ employee_id: empId, date: date, status: status, context: context }, { onConflict: 'employee_id, date' }); 
+                  setSyncStatus('✅ 已同步');
+              } catch(e) { setSyncStatus('❌ 儲存失敗'); } 
+          };
+          
+          const batchUpdateAttendance = async (records) => { 
+              setAttendanceData(prev => {
+                  const newData = { ...prev };
+                  records.forEach(r => { if (!newData[r.employee_id]) newData[r.employee_id] = {}; newData[r.employee_id][r.date] = { status: r.status, context: r.context }; });
+                  return newData;
+              });
+              if (records.length > 0) {
+                  const taskConfig = taskTypes.find(t => t.id === records[0].status);
+                  if (taskConfig && taskConfig.targetCategory) movePersonToCategory(records[0].employee_id, taskConfig.targetCategory);
+              }
+              setSyncStatus('批量更新中...');
+              try { 
+                  await supabase.from('attendance').upsert(records, { onConflict: 'employee_id, date' }); 
+                  setSyncStatus('✅ 批量完成');
+              } catch(e) { setSyncStatus('❌ 批量失敗'); } 
+          };
+
           const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes }, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
-          const handleImportClick = () => fileInputRef.current.click();
+          const handleImportClick = () => { fileInputRef.current.click(); }
           const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (event) => { try { const imported = JSON.parse(event.target.result); if (confirm("匯入?")) { if (imported.settings) { if (imported.settings.categoryGroups) { setCategoryGroups(imported.settings.categoryGroups); await syncDB('app_settings', { key: 'categories', value: imported.settings.categoryGroups }); } if (imported.settings.taskTypes) { setTaskTypes(imported.settings.taskTypes); await syncDB('app_settings', { key: 'task_types', value: imported.settings.taskTypes }); } } if (imported.personnel) { setPersonnel(imported.personnel); await syncDB('personnel', imported.personnel); } if (imported.masterCourses) { setMasterCourses(imported.masterCourses); await syncDB('courses', imported.masterCourses); } if (imported.attendanceData) { setAttendanceData(imported.attendanceData); } if (imported.monthlyData) { await syncDB('monthly_data', imported.monthlyData); } alert("Done"); setForceRefresh(p=>p+1); } } catch(e){} }; reader.readAsText(file); e.target.value=''; };
           const handleSaveCategories = (newGroups) => { setCategoryGroups(newGroups); syncDB('app_settings', { key: 'categories', value: newGroups }); setShowCategoryModal(false); };
           const handleSaveTaskTypes = (newTypes) => { setTaskTypes(newTypes); syncDB('app_settings', { key: 'task_types', value: newTypes }); setShowTaskTypeModal(false); };
@@ -1158,14 +886,15 @@
                 <nav className="fixed md:relative bottom-0 w-full md:w-64 bg-slate-900 border-t md:border-r border-slate-800 z-50 flex md:flex-col justify-around md:justify-start p-2 md:p-6 md:space-y-6 shadow-lg md:shadow-none">
                     <div className="hidden md:flex items-center gap-3 px-2 mb-4"><div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div><span className="font-black text-xl text-slate-100 tracking-tight">人力儀表板</span></div>
                     <button onClick={() => setCurrentView('dashboard')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'dashboard' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Dashboard /> <span className="hidden md:inline">儀表板</span></button>
-                    <button onClick={() => setCurrentView('project')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'project' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Briefcase /> <span className="hidden md:inline">專案管理</span></button>
                     <button onClick={() => setCurrentView('attendance')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'attendance' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.ClipboardCheck /> <span className="hidden md:inline">工作班表</span></button>
                     <button onClick={() => setCurrentView('timeline')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'timeline' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Calendar /> <span className="hidden md:inline">課程時間軸</span></button>
                     <button onClick={() => setCurrentView('personnel')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'personnel' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Users /> <span className="hidden md:inline">人員名單</span></button>
                     <button onClick={() => setCurrentView('analytics')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'analytics' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.BarChart /> <span className="hidden md:inline">數據分析</span></button>
+                    
                     <div className="hidden md:block mt-auto pt-6 border-t border-slate-800">
                         <div className="flex items-center gap-2 text-xs font-bold text-slate-500 px-4 mb-2"><Icons.Cloud /> <span>{syncStatus}</span></div>
                         <button onClick={() => setForceRefresh(p=>p+1)} className="w-full text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 py-2 rounded text-center">重新整理</button>
+                        
                         <div className="grid grid-cols-2 gap-2 px-1 mt-2">
                             <button onClick={handleExport} className="flex items-center justify-center gap-1 text-xs bg-slate-800 hover:bg-indigo-900 text-slate-300 py-2 rounded transition-colors" title="匯出備份"><Icons.Download /> 匯出</button>
                             <button onClick={handleImportClick} className="flex items-center justify-center gap-1 text-xs bg-slate-800 hover:bg-emerald-900 text-slate-300 py-2 rounded transition-colors" title="匯入還原"><Icons.Upload /> 匯入</button>
@@ -1174,7 +903,8 @@
                     </div>
                 </nav>
 
-                <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen bg-slate-950">
+                <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen bg-slate-950 relative">
+
                     {currentView === 'dashboard' && (
                         <div className="space-y-8 fade-in">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1187,7 +917,7 @@
                                     <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
                                     <button onClick={() => setShowCourseModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/50"><Icons.Plus /> 新增課程</button>
                                 </div>
-                                <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程，請點擊右上角新增。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} />)}</tbody></table></div>
+                                <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} />)}</tbody></table></div>
                             </div>
                             <div>
                                 <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
@@ -1230,18 +960,6 @@
                         </div>
                     )}
                     
-                    {currentView === 'project' && <ProjectManagementView 
-                        personnel={personnel} 
-                        allPersonnelList={allPersonnelList} 
-                        masterCourses={masterCourses} 
-                        projects={projects}
-                        setProjects={setProjects}
-                        projectTasks={projectTasks}
-                        setProjectTasks={setProjectTasks}
-                        onAssignPerson={movePersonToCategory} 
-                        onDeleteCourse={handleDeleteCourse} 
-                    />}
-                    
                     {currentView === 'attendance' && <WorkScheduleView 
                         personnel={personnel} 
                         categoryGroups={categoryGroups} 
@@ -1259,8 +977,6 @@
                     {currentView === 'personnel' && <PersonnelView 
                         personnel={personnel}
                         categoryGroups={categoryGroups}
-                        setPersonnel={setPersonnel}
-                        savePersonnelData={(data) => syncDB('personnel', data)}
                         setAddingToCategory={setAddingToCategory}
                         setTempName={setTempName}
                         addingToCategory={addingToCategory}
@@ -1275,17 +991,16 @@
                         setShowCategoryModal={setShowCategoryModal}
                         setCollapsedPersonnelGroups={setCollapsedPersonnelGroups}
                         collapsedPersonnelGroups={collapsedPersonnelGroups}
-                        handleRemovePerson={handleRemovePerson}
-                        projects={projects}
-                        projectTasks={projectTasks}
-                        attendanceData={attendanceData}
-                        masterCourses={masterCourses}
-                        taskTypes={taskTypes}
                     />}
                     
                     {currentView === 'timeline' && <TimelineView masterCourses={masterCourses} />}
-                    
-                    {currentView === 'analytics' && <AnalyticsView personnel={personnel} attendanceData={attendanceData} taskTypes={taskTypes} categoryGroups={categoryGroups} />}
+
+                    {currentView === 'analytics' && <AnalyticsView 
+                        personnel={personnel} 
+                        attendanceData={attendanceData} 
+                        taskTypes={taskTypes} 
+                        categoryGroups={categoryGroups} 
+                    />}
             </main>
 
             {/* Modals */}
