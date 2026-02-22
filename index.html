@@ -925,6 +925,7 @@
           const [syncStatus, setSyncStatus] = useState('連線中...');
           const [forceRefresh, setForceRefresh] = useState(0); 
 
+          const [user, setUser] = useState(null);
           const isEditingAllowed = true;
 
           const [personnel, setPersonnel] = useState({});
@@ -973,9 +974,32 @@
               return list;
           }, [personnel]);
 
-          // Firebase Init
+          // --- 雲端同步與隱形認證 ---
           useEffect(() => {
-              if (!db) { setLoading(false); setSyncStatus('離線模式'); return; }
+              if (!auth) { 
+                  setLoading(false); 
+                  setSyncStatus('離線模式'); 
+                  return; 
+              }
+              const initAuth = async () => {
+                  try {
+                      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                          await signInWithCustomToken(auth, __initial_auth_token);
+                      } else {
+                          await signInAnonymously(auth);
+                      }
+                  } catch (e) {
+                      console.error("Auth init failed:", e);
+                      setSyncStatus('❌ 認證失敗');
+                  }
+              };
+              initAuth();
+              const unsubscribe = onAuthStateChanged(auth, setUser);
+              return () => unsubscribe();
+          }, []);
+
+          useEffect(() => {
+              if (!user || !db) return;
               const unsubscribe = onSnapshot(
                   doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'),
                   (docSnap) => {
@@ -1005,19 +1029,19 @@
                       setSyncStatus('✅ 已同步');
                       setLoading(false);
                   },
-                  (error) => { setSyncStatus('❌ 連線中斷'); setLoading(false); }
+                  (error) => { console.error("Firestore error:", error); setSyncStatus('❌ 連線中斷'); setLoading(false); }
               );
               return () => unsubscribe();
-          }, []);
+          }, [user]);
 
           const saveData = useCallback(async (key, data) => {
-              if (!db) return;
+              if (!user || !db) return;
               setSyncStatus('同步中...');
               try {
                   await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'), { [key]: data }, { merge: true });
                   setSyncStatus('✅ 已同步');
-              } catch (e) { setSyncStatus('❌ 儲存失敗'); }
-          }, []);
+              } catch (e) { console.error(e); setSyncStatus('❌ 儲存失敗'); }
+          }, [user]);
 
           // 核心優化 1: 使用 useMemo 計算衍生狀態 schedule，取代 useEffect 避免 Double Render
           const schedule = useMemo(() => {
