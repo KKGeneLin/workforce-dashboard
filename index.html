@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>人力需求測算儀表板 (即時雲端版 - 效能優化)</title>
+  <title>人力需求測算儀表板 (Supabase 即時雲端版)</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -21,6 +21,8 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- 引入 Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
     body { background-color: #020617; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #e2e8f0; }
@@ -41,37 +43,19 @@
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-    import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-
     // =========================================================================
-    // ⚠️ 雲端資料庫設定 (Firebase Config)
-    // 如果您將此 HTML 檔案下載到自己的電腦點開，原本平台的雲端連線會斷開（進入離線模式）。
-    // 若要讓檔案在任何電腦上都能「永久保存」並「跨網頁同步」，請填入您免費申請的 Firebase 設定：
+    // ⚠️ Supabase 資料庫設定
+    // 請填入您 Supabase 專案的 URL 與 anon key，以啟用雲端同步！
     // =========================================================================
-    const CUSTOM_FIREBASE_CONFIG = {
-        // 在此處貼上您的 Firebase 配置 (取消註解並填入字串)
-        // apiKey: "YOUR_API_KEY",
-        // authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        // projectId: "YOUR_PROJECT_ID",
-        // storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        // messagingSenderId: "YOUR_SENDER_ID",
-        // appId: "YOUR_APP_ID"
-    };
+    const SUPABASE_URL = "https://vepixbcnwmktltzqxcmi.supabase.co"; // 例如: https://xxxx.supabase.co
+    const SUPABASE_ANON_KEY = "sb_publishable_YHpq8WbDhnUPzGPej4Jb9g_PDkBzB5a"; // 貼上 anon public key
     // =========================================================================
 
     const { useState, useMemo, useEffect, useCallback, useRef, memo } = React;
 
-    // --- 雲端連線智慧判斷 ---
-    const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-    const isCustomConfigValid = CUSTOM_FIREBASE_CONFIG && Object.keys(CUSTOM_FIREBASE_CONFIG).length > 0;
-    const finalFirebaseConfig = isCustomConfigValid ? CUSTOM_FIREBASE_CONFIG : envConfig;
-
-    const app = finalFirebaseConfig ? initializeApp(finalFirebaseConfig) : null;
-    const auth = app ? getAuth(app) : null;
-    const db = app ? getFirestore(app) : null;
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'manpower-dashboard-v3';
+    // 初始化 Supabase
+    const isSupabaseConfigured = SUPABASE_URL !== "YOUR_SUPABASE_URL_HERE" && SUPABASE_URL !== "";
+    const supabase = isSupabaseConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
     const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -949,9 +933,6 @@
           const [syncStatus, setSyncStatus] = useState('連線中...');
           const [forceRefresh, setForceRefresh] = useState(0); 
 
-          const [user, setUser] = useState(null);
-          const isEditingAllowed = true;
-
           const [personnel, setPersonnel] = useState({});
           const [categoryGroups, setCategoryGroups] = useState(DEFAULT_CATEGORY_GROUPS);
           const [taskTypes, setTaskTypes] = useState(DEFAULT_TASK_TYPES);
@@ -999,81 +980,90 @@
           }, [personnel]);
 
           // ==========================================
-          // 核心修正：確保本地端也能使用自訂 Firebase 設定，
-          // 並完全移除會導致閃退的非同步寫入衝突。
+          // 核心修正：改用 Supabase 進行跨裝置永久同步
           // ==========================================
           useEffect(() => {
-              if (!db || !auth) { 
+              if (!supabase) { 
                   setLoading(false); 
-                  setSyncStatus('離線模式'); 
+                  setSyncStatus('⚠️ 缺少 Supabase 設定 (離線模式)'); 
                   return; 
               }
 
-              // 隱形登入機制
-              const initAuth = async () => {
+              const loadData = async () => {
+                  setSyncStatus('連線中...');
                   try {
-                      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                          await signInWithCustomToken(auth, __initial_auth_token);
-                      } else {
-                          await signInAnonymously(auth);
-                      }
-                  } catch (e) {
-                      console.error("Firebase 認證失敗:", e);
-                      setSyncStatus('❌ 認證失敗');
-                  }
-              };
-              initAuth();
-              
-              const unsubscribe = onAuthStateChanged(auth, setUser);
-              return () => unsubscribe();
-          }, []);
+                      const { data, error } = await supabase.from('app_settings').select('*');
+                      if (error) throw error;
 
-          // 獲取雲端資料
-          useEffect(() => {
-              if (!user || !db) return;
-              
-              const unsubscribe = onSnapshot(
-                  doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'),
-                  (docSnap) => {
-                      if (docSnap.exists()) {
-                          const data = docSnap.data();
-                          if (data.categoryGroups) setCategoryGroups(data.categoryGroups);
-                          if (data.taskTypes) setTaskTypes(data.taskTypes);
-                          if (data.personnel) setPersonnel(data.personnel);
-                          if (data.masterCourses) setMasterCourses(data.masterCourses);
-                          if (data.attendanceData) setAttendanceData(data.attendanceData);
-                          if (data.monthlyData) {
+                      if (data && data.length > 0) {
+                          const state = {};
+                          data.forEach(row => { state[row.key] = row.value; });
+                          
+                          if (state.categoryGroups) setCategoryGroups(state.categoryGroups);
+                          if (state.taskTypes) setTaskTypes(state.taskTypes);
+                          if (state.personnel) {
+                              // Ensure backwards compatibility with old empty object structures
+                              const merged = {};
+                              const catsToUse = state.categoryGroups ? state.categoryGroups.flatMap(g=>g.items) : categories;
+                              catsToUse.forEach(c => merged[c.id] = state.personnel[c.id] || []);
+                              setPersonnel(merged);
+                          }
+                          if (state.masterCourses) setMasterCourses(state.masterCourses);
+                          if (state.attendanceData) setAttendanceData(state.attendanceData);
+                          if (state.monthlyData) {
                               try {
-                                  const parsed = typeof data.monthlyData === 'string' ? JSON.parse(data.monthlyData) : data.monthlyData;
+                                  const parsed = typeof state.monthlyData === 'string' ? JSON.parse(state.monthlyData) : state.monthlyData;
                                   setMonthlyData(parsed);
                               } catch(e) { console.error("Parse error", e); }
                           }
-                      } else {
-                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'), {
-                              categoryGroups: DEFAULT_CATEGORY_GROUPS,
-                              taskTypes: DEFAULT_TASK_TYPES,
-                              personnel: { ...personnel }, 
-                              masterCourses: [],
-                              attendanceData: {},
-                              monthlyData: JSON.stringify(Array(12).fill([{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }]))
-                          });
                       }
                       setSyncStatus('✅ 已同步');
+                  } catch (err) {
+                      console.error("Supabase load error:", err);
+                      setSyncStatus('❌ 讀取失敗 (請確認 RLS 權限與資料表設定)');
+                  } finally {
                       setLoading(false);
-                  },
-                  (error) => { console.error("Firestore error:", error); setSyncStatus('❌ 連線中斷'); setLoading(false); }
-              );
-              return () => unsubscribe();
-          }, [user]);
+                  }
+              };
 
-          // 防呆儲存機制
+              loadData();
+
+              // 訂閱 Supabase Realtime 更新
+              const channel = supabase.channel('schema-db-changes')
+                  .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload) => {
+                      const { key, value } = payload.new;
+                      if (!key) return;
+                      if (key === 'categoryGroups') setCategoryGroups(value);
+                      else if (key === 'taskTypes') setTaskTypes(value);
+                      else if (key === 'personnel') setPersonnel(value);
+                      else if (key === 'masterCourses') setMasterCourses(value);
+                      else if (key === 'attendanceData') setAttendanceData(value);
+                      else if (key === 'monthlyData') {
+                          try {
+                              const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+                              setMonthlyData(parsed);
+                          } catch(e){}
+                      }
+                  })
+                  .subscribe();
+
+              return () => {
+                  supabase.removeChannel(channel);
+              };
+          }, []);
+
+          // 將資料儲存至 Supabase
           const saveData = useCallback(async (key, data) => {
-              if (!db) return;
+              if (!supabase) return;
               setSyncStatus('同步中...');
               try {
-                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'), { [key]: data }, { merge: true });
+                  const { error } = await supabase.from('app_settings').upsert({ key: key, value: data }, { onConflict: 'key' });
+                  if (error) throw error;
                   setSyncStatus('✅ 已同步');
-              } catch (e) { console.error(e); setSyncStatus('❌ 儲存失敗'); }
+              } catch (e) {
+                  console.error("Save error:", e);
+                  setSyncStatus('❌ 儲存失敗');
+              }
           }, []);
 
           // --- Logic Hooks ---
@@ -1142,7 +1132,7 @@
               monthArr[0] = { ...monthArr[0], students: val };
               newData[mIdx] = monthArr;
               setMonthlyData(newData);
-              saveData('monthlyData', JSON.stringify(newData)); 
+              saveData('monthlyData', newData); // Upsert array as jsonb natively
           }, [monthlyData, saveData]);
 
           const handleConfirmAddPerson = useCallback(() => { if (!tempName.trim() || !addingToCategory) return; const newP = { id: generateId(), name: tempName.trim() }; const newPersonnel = { ...personnel, [addingToCategory]: [...(personnel[addingToCategory] || []), newP] }; setPersonnel(newPersonnel); saveData('personnel', newPersonnel); setTempName(''); setAddingToCategory(null); }, [tempName, addingToCategory, personnel, saveData]);
@@ -1160,43 +1150,46 @@
           const onCatDrop = useCallback((e, targetGroupIdx, targetCatIdx) => { e.preventDefault(); e.stopPropagation(); if (!draggedCatInfo) { clearDragStates(); return; } const { groupIdx: srcG, catIdx: srcC } = draggedCatInfo; if (srcG === targetGroupIdx && srcC === targetCatIdx) { clearDragStates(); return; } const newGroups = JSON.parse(JSON.stringify(categoryGroups)); const [moved] = newGroups[srcG].items.splice(srcC, 1); newGroups[targetGroupIdx].items.splice(targetCatIdx, 0, moved); setCategoryGroups(newGroups); saveData('categoryGroups', newGroups); clearDragStates(); }, [draggedCatInfo, categoryGroups, saveData, clearDragStates]);
 
           const updateAttendance = useCallback(async (empId, date, status, context) => { 
-              const newData = { ...attendanceData };
-              newData[empId] = { ...(newData[empId] || {}) };
-              
-              if (!status) {
-                  delete newData[empId][date];
-              } else {
-                  newData[empId][date] = { status, context };
-              }
-              
-              setAttendanceData(newData);
-              saveData('attendanceData', newData);
+              setAttendanceData(prev => {
+                  const newData = { ...prev };
+                  newData[empId] = { ...(newData[empId] || {}) };
+                  
+                  if (!status) {
+                      delete newData[empId][date];
+                  } else {
+                      newData[empId][date] = { status, context };
+                  }
+                  
+                  saveData('attendanceData', newData);
+                  return newData;
+              });
               
               if (status) {
                   const taskConfig = taskTypes.find(t => t.id === status);
                   if (taskConfig && taskConfig.targetCategory) movePersonToCategory(empId, taskConfig.targetCategory);
               }
-          }, [attendanceData, taskTypes, movePersonToCategory, saveData]);
+          }, [taskTypes, movePersonToCategory, saveData]);
           
           const batchUpdateAttendance = useCallback(async (records) => { 
-              const newData = { ...attendanceData };
-              records.forEach(r => { 
-                  newData[r.employee_id] = { ...(newData[r.employee_id] || {}) }; 
-                  newData[r.employee_id][r.date] = { status: r.status, context: r.context }; 
+              setAttendanceData(prev => {
+                  const newData = { ...prev };
+                  records.forEach(r => { 
+                      newData[r.employee_id] = { ...(newData[r.employee_id] || {}) }; 
+                      newData[r.employee_id][r.date] = { status: r.status, context: r.context }; 
+                  });
+                  saveData('attendanceData', newData);
+                  return newData;
               });
-              
-              setAttendanceData(newData);
-              saveData('attendanceData', newData);
               
               if (records.length > 0) {
                   const taskConfig = taskTypes.find(t => t.id === records[0].status);
                   if (taskConfig && taskConfig.targetCategory) movePersonToCategory(records[0].employee_id, taskConfig.targetCategory);
               }
-          }, [attendanceData, taskTypes, movePersonToCategory, saveData]);
+          }, [taskTypes, movePersonToCategory, saveData]);
 
           const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes }, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
           const handleImportClick = () => { fileInputRef.current.click(); }
-          const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (event) => { try { const imported = JSON.parse(event.target.result); if (confirm("匯入?")) { if (imported.settings) { if (imported.settings.categoryGroups) { setCategoryGroups(imported.settings.categoryGroups); await saveData('categoryGroups', imported.settings.categoryGroups); } if (imported.settings.taskTypes) { setTaskTypes(imported.settings.taskTypes); await saveData('taskTypes', imported.settings.taskTypes); } } if (imported.personnel) { setPersonnel(imported.personnel); await saveData('personnel', imported.personnel); } if (imported.masterCourses) { setMasterCourses(imported.masterCourses); await saveData('masterCourses', imported.masterCourses); } if (imported.attendanceData) { setAttendanceData(imported.attendanceData); await saveData('attendanceData', imported.attendanceData); } if (imported.monthlyData) { await saveData('monthlyData', JSON.stringify(imported.monthlyData)); } alert("Done"); setForceRefresh(p=>p+1); } } catch(e){} }; reader.readAsText(file); e.target.value=''; };
+          const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (event) => { try { const imported = JSON.parse(event.target.result); if (confirm("匯入?")) { if (imported.settings) { if (imported.settings.categoryGroups) { setCategoryGroups(imported.settings.categoryGroups); await saveData('categoryGroups', imported.settings.categoryGroups); } if (imported.settings.taskTypes) { setTaskTypes(imported.settings.taskTypes); await saveData('taskTypes', imported.settings.taskTypes); } } if (imported.personnel) { setPersonnel(imported.personnel); await saveData('personnel', imported.personnel); } if (imported.masterCourses) { setMasterCourses(imported.masterCourses); await saveData('masterCourses', imported.masterCourses); } if (imported.attendanceData) { setAttendanceData(imported.attendanceData); await saveData('attendanceData', imported.attendanceData); } if (imported.monthlyData) { await saveData('monthlyData', imported.monthlyData); } alert("Done"); setForceRefresh(p=>p+1); } } catch(e){} }; reader.readAsText(file); e.target.value=''; };
           const handleSaveCategories = (newGroups) => { setCategoryGroups(newGroups); saveData('categoryGroups', newGroups); setShowCategoryModal(false); };
           const handleSaveTaskTypes = (newTypes) => { setTaskTypes(newTypes); saveData('taskTypes', newTypes); setShowTaskTypeModal(false); };
 
@@ -1255,7 +1248,7 @@
                                     <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
                                     <button onClick={() => setShowCourseModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/50"><Icons.Plus /> 新增課程</button>
                                 </div>
-                                <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} isEditingAllowed={isEditingAllowed} />)}</tbody></table></div>
+                                <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} isEditingAllowed={true} />)}</tbody></table></div>
                             </div>
                             <div>
                                 <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
@@ -1310,7 +1303,7 @@
                         wsShowBatchModal={wsShowBatchModal} setWsShowBatchModal={setWsShowBatchModal}
                         wsBatchForm={wsBatchForm} setWsBatchForm={setWsBatchForm}
                         dailyStats={dailyStats}
-                        isEditingAllowed={isEditingAllowed}
+                        isEditingAllowed={true}
                     />}
                     
                     {currentView === 'personnel' && <PersonnelView 
@@ -1338,7 +1331,7 @@
                         onCatDragStart={onCatDragStart}
                         onCatDrop={onCatDrop}
                         clearDragStates={clearDragStates}
-                        isEditingAllowed={isEditingAllowed}
+                        isEditingAllowed={true}
                     />}
                     
                     {currentView === 'timeline' && <TimelineView masterCourses={masterCourses} />}
@@ -1352,7 +1345,7 @@
             </main>
 
             {/* Modals */}
-            {showCourseModal && isEditingAllowed && (
+            {showCourseModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 border border-slate-800">
                         <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增課程計畫</h3><button onClick={() => setShowCourseModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
@@ -1374,7 +1367,7 @@
                 </div>
             )}
             
-            {showCategoryModal && isEditingAllowed && (
+            {showCategoryModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 border border-slate-800 max-h-[80vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">管理人員分類</h3><button onClick={() => setShowCategoryModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
@@ -1433,7 +1426,7 @@
                 </div>
             )}
             
-            {showTaskTypeModal && isEditingAllowed && (
+            {showTaskTypeModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 border border-slate-800 max-h-[80vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">管理工作類型</h3><button onClick={() => setShowTaskTypeModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
@@ -1481,7 +1474,7 @@
                 </div>
             )}
             
-            {showDeleteModal && isEditingAllowed && (
+            {showDeleteModal && (
               <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                 <div className="bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-slate-800">
                   <h3 className="font-bold text-lg text-slate-100 mb-2">確認刪除?</h3>
