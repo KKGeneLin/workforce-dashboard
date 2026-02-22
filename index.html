@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>人力需求測算儀表板 (即時雲端版)</title>
+  <title>人力需求測算儀表板 (即時雲端版 - 效能優化)</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -12,11 +12,7 @@
       theme: {
         extend: {
           colors: {
-            slate: {
-              850: '#1e293b', 
-              900: '#0f172a',
-              950: '#020617',
-            }
+            slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' }
           }
         }
       }
@@ -34,10 +30,6 @@
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
     .dragging { opacity: 0.5; }
     .header-transition { transition: all 0.3s ease-in-out; }
-    .stats-container { transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, margin 0.3s ease-in-out; overflow: hidden; }
-    .stats-visible { max-height: 500px; opacity: 1; margin-bottom: 1.5rem; }
-    .stats-hidden { max-height: 0; opacity: 0; margin-bottom: 0; }
-    .timeline-grid { background-image: linear-gradient(to right, #1e293b 1px, transparent 1px); background-size: 8.33% 100%; }
     .attendance-cell { transition: all 0.1s; cursor: pointer; height: 48px; vertical-align: middle; padding: 2px; border-right: 1px solid #1e293b; border-bottom: 1px solid #1e293b; }
     .attendance-cell:hover { background-color: #1e293b; }
     .task-block { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border-radius: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: transform 0.1s, box-shadow 0.1s; padding: 0 4px; position: relative; }
@@ -53,7 +45,7 @@
     import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
     import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-    const { useState, useMemo, useEffect, useRef } = React;
+    const { useState, useMemo, useEffect, useCallback, useRef, memo } = React;
 
     // --- 雲端連線設定 ---
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
@@ -82,8 +74,6 @@
       Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
       Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
       Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
-      Briefcase: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
-      List: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
       BarChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>,
       UserIcon: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     };
@@ -92,7 +82,7 @@
     const DEFAULT_CATEGORY_GROUPS = [
         { name: '管理', items: [{ id: 'supervisor', label: '主管', type: 'admin' }, { id: 'leader', label: '組長', type: 'admin' }] },
         { name: '專項', items: [{ id: 'marketing', label: '社群', type: 'admin' }, { id: 'content', label: '內容', type: 'admin' }, { id: 'instructor', label: '講師', type: 'teaching' }, { id: 'captain', label: '隊長', type: 'frontline' }, { id: 'innovation', label: '創新', type: 'admin' }]},
-        { name: '專案', items: [{ id: 'bootcamp', label: '線條訓練營', type: 'frontline' }, { id: 'camp_color', label: '色彩訓練營', type: 'frontline' }, { id: 'sketch', label: '速寫團練', type: 'frontline' }, { id: 'monthly', label: '月月繪', type: 'frontline' }]},
+        { name: '專案', items: [{ id: 'bootcamp', label: '線條訓練營', type: 'frontline' }, { id: 'camp_color', label: '色彩訓練營', type: 'frontline' }, { id: 'sketch', label: '速寫團練', type: 'frontline' } ]},
         { name: '正課', items: [{ id: 'regular', label: '透視', type: 'frontline' }, { id: 'reg_comp', label: '構成', type: 'frontline' }, { id: 'reg_color', label: '色彩', type: 'frontline' }, { id: 'dlc', label: 'DLC', type: 'frontline' }]},
         { name: '待命', items: [{ id: 'pool', label: '尚未分配', type: 'pool' }] }
     ];
@@ -104,7 +94,7 @@
         { id: 'sketch_camp', label: '速寫營', color: 'bg-orange-600 text-orange-50 shadow-sm shadow-orange-900/50', targetCategory: 'sketch' },
         { id: 'line_camp', label: '線條營', color: 'bg-emerald-600 text-emerald-50 shadow-sm shadow-emerald-900/50', targetCategory: 'bootcamp' },
         { id: 'color_camp', label: '色彩營', color: 'bg-purple-600 text-purple-50 shadow-sm shadow-purple-900/50', targetCategory: 'camp_color' },
-        { id: 'monthly_paint', label: '月月繪', color: 'bg-cyan-600 text-cyan-50 shadow-sm shadow-cyan-900/50', targetCategory: 'monthly' },
+        { id: 'monthly_paint', label: '月月繪', color: 'bg-cyan-600 text-cyan-50 shadow-sm shadow-cyan-900/50', targetCategory: null },
         { id: 'leave', label: '休假', color: 'bg-rose-600 text-rose-50 shadow-sm shadow-rose-900/50', targetCategory: null }, 
     ];
 
@@ -117,8 +107,8 @@
         { label: '速寫團練', value: 'sketch', days: 60 },
     ];
 
-    // --- Components ---
-    const KPICard = ({ title, value, icon, color }) => (
+    // --- UI Components (Memoized for Performance) ---
+    const KPICard = memo(({ title, value, icon, color }) => (
         <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex items-center gap-4 hover:scale-[1.02] transition-transform">
             <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
             <div>
@@ -126,23 +116,23 @@
                 <div className="text-2xl font-black text-white">{value}</div>
             </div>
         </div>
-    );
+    ));
 
-    const CourseRow = ({ course, onUpdate, onDelete }) => (
+    const CourseRow = memo(({ course, onUpdate, onDelete, isEditingAllowed }) => (
         <tr className="border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors">
             <td className="p-3 font-bold text-slate-200">{course.name}</td>
             <td className="p-3 text-slate-400">{course.batch || '-'}</td>
-            <td className="p-3"><input type="date" value={course.startDate} onChange={e => onUpdate(course.id, 'startDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-28 text-sm text-slate-300" /></td>
-            <td className="p-3"><input type="number" value={course.duration} onChange={e => onUpdate(course.id, 'duration', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-12 text-center text-sm text-slate-300" /></td>
-            <td className="p-3"><input type="date" value={course.endDate} onChange={e => onUpdate(course.id, 'endDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-28 text-sm text-slate-300" /></td>
-            <td className="p-3"><input type="number" value={course.students} onChange={e => onUpdate(course.id, 'students', parseInt(e.target.value) || 0)} className="bg-transparent font-bold text-indigo-400 border-b border-dashed border-indigo-900 focus:border-indigo-400 outline-none w-16 text-center" /></td>
+            <td className="p-3"><input type="date" value={course.startDate} disabled={!isEditingAllowed} onChange={e => onUpdate(course.id, 'startDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-28 text-sm text-slate-300 disabled:opacity-50 disabled:border-transparent" /></td>
+            <td className="p-3"><input type="number" value={course.duration} disabled={!isEditingAllowed} onChange={e => onUpdate(course.id, 'duration', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-12 text-center text-sm text-slate-300 disabled:opacity-50 disabled:border-transparent" /></td>
+            <td className="p-3"><input type="date" value={course.endDate} disabled={!isEditingAllowed} onChange={e => onUpdate(course.id, 'endDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-28 text-sm text-slate-300 disabled:opacity-50 disabled:border-transparent" /></td>
+            <td className="p-3"><input type="number" value={course.students} disabled={!isEditingAllowed} onChange={e => onUpdate(course.id, 'students', parseInt(e.target.value) || 0)} className="bg-transparent font-bold text-indigo-400 border-b border-dashed border-indigo-900 focus:border-indigo-400 outline-none w-16 text-center disabled:opacity-50 disabled:border-transparent" /></td>
             <td className="p-3 text-right">
-                <button onClick={() => onDelete(course.id)} className="text-slate-500 hover:text-rose-500 p-1"><Icons.Trash /></button>
+                {isEditingAllowed && <button onClick={() => onDelete(course.id)} className="text-slate-500 hover:text-rose-500 p-1"><Icons.Trash /></button>}
             </td>
         </tr>
-    );
+    ));
 
-    const TimelineView = ({ masterCourses }) => {
+    const TimelineView = memo(({ masterCourses }) => {
         const [year, setYear] = useState(new Date().getFullYear());
         const months = Array.from({length: 12}, (_, i) => i + 1);
         const getCourseColor = (type) => {
@@ -190,9 +180,9 @@
                 </div>
             </div>
         );
-    };
+    });
 
-    const WorkScheduleView = ({ personnel, categoryGroups, attendanceData, onUpdateAttendance, onBatchUpdate, taskTypes, setShowTaskTypeModal, wsSearchTerm, setWsSearchTerm, dailyStats, wsShowBatchModal, setWsShowBatchModal, wsBatchForm, setWsBatchForm }) => {
+    const WorkScheduleView = memo(({ personnel, categoryGroups, attendanceData, onUpdateAttendance, onBatchUpdate, taskTypes, setShowTaskTypeModal, wsSearchTerm, setWsSearchTerm, dailyStats, wsShowBatchModal, setWsShowBatchModal, wsBatchForm, setWsBatchForm, isEditingAllowed }) => {
         const [selectedMonth, setSelectedMonth] = useState(new Date());
         const [viewMode, setViewMode] = useState('week'); 
         const [expandedGroups, setExpandedGroups] = useState({});
@@ -204,9 +194,6 @@
                setExpandedGroups(categoryGroups.reduce((acc, g) => ({...acc, [g.name]: true}), {}));
            }
         }, [categoryGroups]);
-
-        const daysInMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
-        const days = Array.from({length: daysInMonth}, (_, i) => i + 1);
 
         const datesToShow = useMemo(() => {
             if (viewMode === 'month') {
@@ -230,13 +217,13 @@
            ? `${selectedMonth.getFullYear()}年 ${selectedMonth.getMonth()+1}月`
            : `${datesToShow[0].getMonth()+1}/${datesToShow[0].getDate()} - ${datesToShow[6].getMonth()+1}/${datesToShow[6].getDate()}`;
 
-        const filteredGroups = categoryGroups.map(g => {
+        const filteredGroups = useMemo(() => categoryGroups.map(g => {
             const filteredItems = g.items.map(cat => ({
                 ...cat,
                 people: (personnel[cat.id] || []).filter(p => p.name.includes(wsSearchTerm))
             })).filter(cat => cat.people.length > 0);
             return { ...g, items: filteredItems };
-        }).filter(g => g.items.length > 0);
+        }).filter(g => g.items.length > 0), [categoryGroups, personnel, wsSearchTerm]);
         
         const handleNavigate = (dir) => {
            const d = new Date(selectedMonth);
@@ -246,6 +233,7 @@
         };
 
         const handleCellClick = (e, empId, dateStr, context) => {
+            if (!isEditingAllowed) return;
             const rect = e.target.getBoundingClientRect();
             setPopover({ empId, dateStr, x: rect.left, y: rect.bottom + window.scrollY });
             setPopoverContext(context || "");
@@ -289,8 +277,8 @@
                         <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${viewMode === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>月檢視</button>
                     </div>
                     <div className="flex items-center gap-4">
-                         <button onClick={() => setShowTaskTypeModal(true)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-900 px-2 py-1 rounded">⚙️ 設定</button>
-                         <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md"><Icons.Plus /> 新增紀錄</button>
+                         {isEditingAllowed && <button onClick={() => setShowTaskTypeModal(true)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-900 px-2 py-1 rounded">⚙️ 設定</button>}
+                         {isEditingAllowed && <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md"><Icons.Plus /> 新增紀錄</button>}
                          <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"><Icons.Search /><input className="bg-transparent border-none outline-none text-sm w-32 text-slate-200" placeholder="搜尋姓名..." value={wsSearchTerm} onChange={e => setWsSearchTerm(e.target.value)} /></div>
                          <div className="flex gap-4 text-xs font-medium text-slate-400">
                              <span>今日工作: <span className="text-blue-400 font-bold">{dailyStats.workingToday}</span></span>
@@ -333,7 +321,7 @@
                                                         const statusConfig = taskTypes.find(t => t.id === record?.status);
                                                         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                                                         return (
-                                                            <td key={dateStr} onClick={(e) => handleCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''} cursor-pointer`}>
+                                                            <td key={dateStr} onClick={(e) => handleCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''} ${isEditingAllowed ? 'cursor-pointer' : 'cursor-default'}`}>
                                                                 {statusConfig ? (
                                                                     <div className={`task-block ${statusConfig.color}`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
                                                                         {viewMode === 'week' ? (record.context || statusConfig.label) : (record.context ? record.context.substring(0,2) : statusConfig.label.substring(0,1))}
@@ -352,7 +340,7 @@
                     </div>
                     
                     {/* Popover */}
-                    {popover && (
+                    {popover && isEditingAllowed && (
                         <div className="fixed z-50 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: popover.y + 5, left: Math.min(popover.x - 60, window.innerWidth - 200) }}>
                             <input type="text" placeholder="工作內容..." className="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 mb-1 outline-none focus:border-indigo-500 text-slate-200" autoFocus value={popoverContext} onChange={e => setPopoverContext(e.target.value)} />
                             <div className="grid grid-cols-2 gap-1.5">{taskTypes.map(type => (<button key={type.id} onClick={() => handleSaveCell(type.id)} className={`text-[10px] px-2 py-1.5 rounded text-center font-bold shadow-sm ${type.color} opacity-90 hover:opacity-100`}>{type.label}</button>))}</div>
@@ -364,7 +352,7 @@
                 </div>
                 
                 {/* Batch Modal */}
-                {wsShowBatchModal && (
+                {wsShowBatchModal && isEditingAllowed && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                         <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-800">
                             <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增紀錄</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
@@ -383,10 +371,10 @@
                 )}
             </div>
         );
-    };
+    });
 
-    const AnalyticsView = ({ personnel, attendanceData, taskTypes, categoryGroups }) => {
-        const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'gantt' | 'personal'
+    const AnalyticsView = memo(({ personnel, attendanceData, taskTypes, categoryGroups }) => {
+        const [activeTab, setActiveTab] = useState('overview'); 
         const [selectedMonth, setSelectedMonth] = useState(() => {
             const d = new Date();
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -433,11 +421,9 @@
                     
                     if (record && record.status) {
                         const isLeave = record.status === 'leave';
-                        if (isLeave) {
-                            leaveDays++;
-                        } else {
-                            workDays++;
-                        }
+                        if (isLeave) leaveDays++;
+                        else workDays++;
+                        
                         personalTaskCounts[record.status] = (personalTaskCounts[record.status] || 0) + 1;
                         globalTaskCounts[record.status] = (globalTaskCounts[record.status] || 0) + 1;
                         totalGlobalTasks++;
@@ -834,9 +820,9 @@
                 )}
             </div>
         );
-    };
+    });
 
-    const PersonnelView = ({ 
+    const PersonnelView = memo(({ 
         personnel, categoryGroups, setAddingToCategory, setTempName, addingToCategory, tempName, handleConfirmAddPerson, setDeleteTarget, setShowDeleteModal, 
         onGroupDragStart, onDragOver, onGroupDrop, onCatDragStart, onCatDrop, onPersonDragStart, onPersonDrop, dragOverContainer, setShowCategoryModal, 
         setCollapsedPersonnelGroups, collapsedPersonnelGroups, draggedGroupIdx, draggedCatInfo, draggedItem, clearDragStates
@@ -931,7 +917,7 @@
                 ))}
             </div>
         );
-    };
+    });
 
     const App = () => {
           const [currentView, setCurrentView] = useState('dashboard');
@@ -939,18 +925,14 @@
           const [syncStatus, setSyncStatus] = useState('連線中...');
           const [forceRefresh, setForceRefresh] = useState(0); 
 
-          const [user, setUser] = useState(null);
+          const isEditingAllowed = true;
 
           const [personnel, setPersonnel] = useState({});
           const [categoryGroups, setCategoryGroups] = useState(DEFAULT_CATEGORY_GROUPS);
           const [taskTypes, setTaskTypes] = useState(DEFAULT_TASK_TYPES);
           const [attendanceData, setAttendanceData] = useState({});
           const [masterCourses, setMasterCourses] = useState([]);
-          const [schedule, setSchedule] = useState(() => Array.from({ length: 12 }, (_, i) => ({
-              month: `${i + 1}月`, 
-              monthly: [{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }], 
-              early: [], mid: [], late: [] 
-          })));
+          const [monthlyData, setMonthlyData] = useState(() => Array(12).fill([{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }]));
           
           const [draggedItem, setDraggedItem] = useState(null);
           const [dragOverContainer, setDragOverContainer] = useState(null);
@@ -991,38 +973,9 @@
               return list;
           }, [personnel]);
 
-          // --- 雲端同步與認證 ---
+          // Firebase Init
           useEffect(() => {
-              if (typeof __firebase_config === 'undefined') {
-                  setLoading(false);
-                  setSyncStatus('離線模式');
-                  return;
-              }
-              
-              const initAuth = async () => {
-                  if (!auth) return;
-                  try {
-                      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                          await signInWithCustomToken(auth, __initial_auth_token);
-                      } else {
-                          await signInAnonymously(auth);
-                      }
-                  } catch (e) {
-                      console.error("Auth init failed:", e);
-                      setLoading(false);
-                  }
-              };
-              initAuth();
-              
-              if(auth) {
-                  const unsubscribe = onAuthStateChanged(auth, setUser);
-                  return () => unsubscribe();
-              }
-          }, []);
-
-          useEffect(() => {
-              if (!user || !db) return;
-              
+              if (!db) { setLoading(false); setSyncStatus('離線模式'); return; }
               const unsubscribe = onSnapshot(
                   doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'),
                   (docSnap) => {
@@ -1035,15 +988,9 @@
                           if (data.attendanceData) setAttendanceData(data.attendanceData);
                           if (data.monthlyData) {
                               try {
-                                  const parsedMonthly = typeof data.monthlyData === 'string' ? JSON.parse(data.monthlyData) : data.monthlyData;
-                                  setSchedule(prev => {
-                                      const newSched = [...prev];
-                                      newSched.forEach((m, i) => { if (parsedMonthly[i]) m.monthly = parsedMonthly[i]; });
-                                      return newSched;
-                                  });
-                              } catch(e) {
-                                  console.error("Failed to parse monthlyData", e);
-                              }
+                                  const parsed = typeof data.monthlyData === 'string' ? JSON.parse(data.monthlyData) : data.monthlyData;
+                                  setMonthlyData(parsed);
+                              } catch(e) { console.error("Parse error", e); }
                           }
                       } else {
                           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'), {
@@ -1058,30 +1005,47 @@
                       setSyncStatus('✅ 已同步');
                       setLoading(false);
                   },
-                  (error) => {
-                      console.error("Firestore error:", error);
-                      setSyncStatus('❌ 連線中斷');
-                      setLoading(false);
-                  }
+                  (error) => { setSyncStatus('❌ 連線中斷'); setLoading(false); }
               );
               return () => unsubscribe();
-          }, [user]);
+          }, []);
 
-          const saveData = async (key, data) => {
+          const saveData = useCallback(async (key, data) => {
               if (!db) return;
               setSyncStatus('同步中...');
               try {
-                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'), {
-                      [key]: data
-                  }, { merge: true });
+                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dashboard', 'main'), { [key]: data }, { merge: true });
                   setSyncStatus('✅ 已同步');
-              } catch (e) {
-                  console.error(e);
-                  setSyncStatus('❌ 儲存失敗');
-              }
-          };
+              } catch (e) { setSyncStatus('❌ 儲存失敗'); }
+          }, []);
 
-          const movePersonToCategory = (empId, targetCatId) => {
+          // 核心優化 1: 使用 useMemo 計算衍生狀態 schedule，取代 useEffect 避免 Double Render
+          const schedule = useMemo(() => {
+              const newSchedule = Array.from({ length: 12 }, (_, i) => ({
+                  month: `${i + 1}月`,
+                  monthly: monthlyData[i] || [{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }],
+                  early: [], mid: [], late: []
+              }));
+
+              masterCourses.forEach(course => {
+                  if (!course.startDate || !course.endDate) return;
+                  const start = new Date(course.startDate);
+                  const end = new Date(course.endDate);
+                  for (let m = 0; m < 12; m++) {
+                      const periods = [{ key: 'early', s: 1, e: 10 }, { key: 'mid', s: 11, e: 20 }, { key: 'late', s: 21, e: 31 }];
+                      periods.forEach(p => {
+                          const testStart = new Date(start.getFullYear(), m, p.s);
+                          const testEnd = new Date(start.getFullYear(), m, p.e);
+                          if (start <= testEnd && end >= testStart) {
+                              newSchedule[m][p.key].push({ name: course.name, type: course.type, students: course.students, batch: course.batch });
+                          }
+                      });
+                  }
+              });
+              return newSchedule;
+          }, [masterCourses, monthlyData]);
+
+          const movePersonToCategory = useCallback((empId, targetCatId) => {
               if (!targetCatId) return;
               setPersonnel(prevPersonnel => {
                   let currentCatId = null;
@@ -1100,7 +1064,7 @@
                   }
                   return prevPersonnel;
               });
-          };
+          }, [saveData]);
 
           useEffect(() => {
             const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -1108,73 +1072,36 @@
             return () => window.removeEventListener('scroll', handleScroll);
           }, []);
 
-          // --- Logic Hooks ---
-          useEffect(() => {
-              setSchedule(prev => {
-                  const newSchedule = prev.length > 0 ? JSON.parse(JSON.stringify(prev)) : [];
-                  if(newSchedule.length===0) return [];
-                  newSchedule.forEach(m => { m.early = []; m.mid = []; m.late = []; });
-                  masterCourses.forEach(course => {
-                      if (!course.startDate || !course.endDate) return;
-                      const start = new Date(course.startDate);
-                      const end = new Date(course.endDate);
-                      for (let m = 0; m < 12; m++) {
-                          const periods = [{ key: 'early', s: 1, e: 10 }, { key: 'mid', s: 11, e: 20 }, { key: 'late', s: 21, e: 31 }];
-                          periods.forEach(p => {
-                              const testStart = new Date(start.getFullYear(), m, p.s);
-                              const testEnd = new Date(start.getFullYear(), m, p.e);
-                              if (start <= testEnd && end >= testStart) {
-                                  newSchedule[m][p.key].push({ name: course.name, type: course.type, students: course.students, batch: course.batch });
-                              }
-                          });
-                      }
-                  });
-                  return newSchedule;
-              });
-          }, [masterCourses]);
-
           const calculateEndDate = (startStr, days) => { if (!startStr || !days) return ''; const d = new Date(startStr); d.setDate(d.getDate() + parseInt(days) - 1); return d.toISOString().split('T')[0]; };
           const calculateDuration = (startStr, endStr) => { if (!startStr || !endStr) return 0; const s = new Date(startStr), e = new Date(endStr); if (e < s) return 0; return Math.ceil(Math.abs(e - s) / (86400000)) + 1; };
 
-          const handleAddCourse = () => { if (!newCourse.name || !newCourse.startDate) { setErrorMsg("請填寫必要資訊"); return; } const updated = [...masterCourses, { ...newCourse, id: generateId() }]; setMasterCourses(updated); saveData('masterCourses', updated); setNewCourse({ ...newCourse, batch: '', students: 0, startDate: '', endDate: '' }); setShowCourseModal(false); setErrorMsg(''); };
-          const handleUpdateCourse = (id, field, val) => { const updated = masterCourses.map(c => { if (c.id !== id) return c; const nc = { ...c, [field]: val }; if (field === 'startDate') nc.endDate = calculateEndDate(val, nc.duration); if (field === 'duration') nc.endDate = calculateEndDate(nc.startDate, val); if (field === 'endDate') nc.duration = calculateDuration(nc.startDate, val); return nc; }); setMasterCourses(updated); saveData('masterCourses', updated); };
-          const handleDeleteCourse = (id) => { if (!confirm("確定刪除？")) return; const updated = masterCourses.filter(c => c.id !== id); setMasterCourses(updated); saveData('masterCourses', updated); };
-          const handleMonthlyChange = (mIdx, val) => { const newSched = [...schedule]; newSched[mIdx].monthly[0].students = val; setSchedule(newSched); saveData('monthlyData', JSON.stringify(newSched.map(m => m.monthly))); };
-          const handleConfirmAddPerson = () => { if (!tempName.trim() || !addingToCategory) return; const newP = { id: generateId(), name: tempName.trim() }; const newPersonnel = { ...personnel, [addingToCategory]: [...(personnel[addingToCategory] || []), newP] }; setPersonnel(newPersonnel); saveData('personnel', newPersonnel); setTempName(''); setAddingToCategory(null); };
-          const handleRemovePerson = () => { if (!deleteTarget) return; const newPersonnel = { ...personnel }; newPersonnel[deleteTarget.categoryId] = newPersonnel[deleteTarget.categoryId].filter(p => p.id !== deleteTarget.personId); setPersonnel(newPersonnel); saveData('personnel', newPersonnel); setShowDeleteModal(false); };
+          const handleAddCourse = useCallback(() => { if (!newCourse.name || !newCourse.startDate) { setErrorMsg("請填寫必要資訊"); return; } const updated = [...masterCourses, { ...newCourse, id: generateId() }]; setMasterCourses(updated); saveData('masterCourses', updated); setNewCourse({ ...newCourse, batch: '', students: 0, startDate: '', endDate: '' }); setShowCourseModal(false); setErrorMsg(''); }, [masterCourses, newCourse, saveData]);
+          const handleUpdateCourse = useCallback((id, field, val) => { const updated = masterCourses.map(c => { if (c.id !== id) return c; const nc = { ...c, [field]: val }; if (field === 'startDate') nc.endDate = calculateEndDate(val, nc.duration); if (field === 'duration') nc.endDate = calculateEndDate(nc.startDate, val); if (field === 'endDate') nc.duration = calculateDuration(nc.startDate, val); return nc; }); setMasterCourses(updated); saveData('masterCourses', updated); }, [masterCourses, saveData]);
+          const handleDeleteCourse = useCallback((id) => { if (!confirm("確定刪除？")) return; const updated = masterCourses.filter(c => c.id !== id); setMasterCourses(updated); saveData('masterCourses', updated); }, [masterCourses, saveData]);
+          
+          // 核心優化 3: 獨立處理 monthlyData 避免不必要的 schedule 深拷貝
+          const handleMonthlyChange = useCallback((mIdx, val) => { 
+              const newData = [...monthlyData];
+              if(!newData[mIdx]) newData[mIdx] = [{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }];
+              newData[mIdx][0].students = val;
+              setMonthlyData(newData);
+              saveData('monthlyData', JSON.stringify(newData)); 
+          }, [monthlyData, saveData]);
+
+          const handleConfirmAddPerson = useCallback(() => { if (!tempName.trim() || !addingToCategory) return; const newP = { id: generateId(), name: tempName.trim() }; const newPersonnel = { ...personnel, [addingToCategory]: [...(personnel[addingToCategory] || []), newP] }; setPersonnel(newPersonnel); saveData('personnel', newPersonnel); setTempName(''); setAddingToCategory(null); }, [tempName, addingToCategory, personnel, saveData]);
+          const handleRemovePerson = useCallback(() => { if (!deleteTarget) return; const newPersonnel = { ...personnel }; newPersonnel[deleteTarget.categoryId] = newPersonnel[deleteTarget.categoryId].filter(p => p.id !== deleteTarget.personId); setPersonnel(newPersonnel); saveData('personnel', newPersonnel); setShowDeleteModal(false); }, [deleteTarget, personnel, saveData]);
           
           // --- Drag & Drop Handlers ---
-          const clearDragStates = () => { setDraggedItem(null); setDragOverContainer(null); setDraggedGroupIdx(null); setDraggedCatInfo(null); };
+          const clearDragStates = useCallback(() => { setDraggedItem(null); setDragOverContainer(null); setDraggedGroupIdx(null); setDraggedCatInfo(null); }, []);
+          const onDragStart = useCallback((e, person, fromCategory) => { e.stopPropagation(); setDraggedItem({ person, fromCategory }); e.dataTransfer.effectAllowed = 'move'; }, []);
+          const onDragOver = useCallback((e, catId) => { e.preventDefault(); if (dragOverContainer !== catId) setDragOverContainer(catId); }, [dragOverContainer]);
+          const onDrop = useCallback((e, toCategory) => { e.preventDefault(); setDragOverContainer(null); if (!draggedItem || draggedItem.fromCategory === toCategory) return; const newPersonnel = { ...personnel }; newPersonnel[draggedItem.fromCategory] = newPersonnel[draggedItem.fromCategory].filter(p => p.id !== draggedItem.person.id); newPersonnel[toCategory] = [...(newPersonnel[toCategory] || []), draggedItem.person]; setPersonnel(newPersonnel); saveData('personnel', newPersonnel); setDraggedItem(null); }, [draggedItem, personnel, saveData]);
+          const onGroupDragStart = useCallback((e, idx) => { e.stopPropagation(); setDraggedGroupIdx(idx); e.dataTransfer.effectAllowed = 'move'; }, []);
+          const onGroupDrop = useCallback((e, dropIdx) => { e.preventDefault(); e.stopPropagation(); if (draggedGroupIdx === null || draggedGroupIdx === dropIdx) { clearDragStates(); return; } const newGroups = [...categoryGroups]; const [moved] = newGroups.splice(draggedGroupIdx, 1); newGroups.splice(dropIdx, 0, moved); setCategoryGroups(newGroups); saveData('categoryGroups', newGroups); clearDragStates(); }, [draggedGroupIdx, categoryGroups, saveData, clearDragStates]);
+          const onCatDragStart = useCallback((e, groupIdx, catIdx) => { e.stopPropagation(); setDraggedCatInfo({ groupIdx, catIdx }); e.dataTransfer.effectAllowed = 'move'; }, []);
+          const onCatDrop = useCallback((e, targetGroupIdx, targetCatIdx) => { e.preventDefault(); e.stopPropagation(); if (!draggedCatInfo) { clearDragStates(); return; } const { groupIdx: srcG, catIdx: srcC } = draggedCatInfo; if (srcG === targetGroupIdx && srcC === targetCatIdx) { clearDragStates(); return; } const newGroups = JSON.parse(JSON.stringify(categoryGroups)); const [moved] = newGroups[srcG].items.splice(srcC, 1); newGroups[targetGroupIdx].items.splice(targetCatIdx, 0, moved); setCategoryGroups(newGroups); saveData('categoryGroups', newGroups); clearDragStates(); }, [draggedCatInfo, categoryGroups, saveData, clearDragStates]);
 
-          const onDragStart = (e, person, fromCategory) => { e.stopPropagation(); setDraggedItem({ person, fromCategory }); e.dataTransfer.effectAllowed = 'move'; };
-          const onDragOver = (e, catId) => { e.preventDefault(); if (dragOverContainer !== catId) setDragOverContainer(catId); };
-          const onDrop = (e, toCategory) => { e.preventDefault(); setDragOverContainer(null); if (!draggedItem || draggedItem.fromCategory === toCategory) return; const newPersonnel = { ...personnel }; newPersonnel[draggedItem.fromCategory] = newPersonnel[draggedItem.fromCategory].filter(p => p.id !== draggedItem.person.id); newPersonnel[toCategory] = [...(newPersonnel[toCategory] || []), draggedItem.person]; setPersonnel(newPersonnel); saveData('personnel', newPersonnel); setDraggedItem(null); };
-          
-          const onGroupDragStart = (e, idx) => { e.stopPropagation(); setDraggedGroupIdx(idx); e.dataTransfer.effectAllowed = 'move'; };
-          const onGroupDrop = (e, dropIdx) => { 
-              e.preventDefault(); e.stopPropagation(); 
-              if (draggedGroupIdx === null || draggedGroupIdx === dropIdx) { clearDragStates(); return; }
-              const newGroups = [...categoryGroups]; 
-              const [moved] = newGroups.splice(draggedGroupIdx, 1); 
-              newGroups.splice(dropIdx, 0, moved); 
-              handleSaveCategories(newGroups); 
-              clearDragStates(); 
-          };
-          
-          const onCatDragStart = (e, groupIdx, catIdx) => { e.stopPropagation(); setDraggedCatInfo({ groupIdx, catIdx }); e.dataTransfer.effectAllowed = 'move'; };
-          const onCatDrop = (e, targetGroupIdx, targetCatIdx) => { 
-              e.preventDefault(); e.stopPropagation(); 
-              if (!draggedCatInfo) { clearDragStates(); return; }
-              const { groupIdx: srcG, catIdx: srcC } = draggedCatInfo; 
-              if (srcG === targetGroupIdx && srcC === targetCatIdx) { clearDragStates(); return; } 
-              const newGroups = JSON.parse(JSON.stringify(categoryGroups)); 
-              const [moved] = newGroups[srcG].items.splice(srcC, 1); 
-              newGroups[targetGroupIdx].items.splice(targetCatIdx, 0, moved); 
-              handleSaveCategories(newGroups); 
-              clearDragStates(); 
-          };
-
-          const updateAttendance = async (empId, date, status, context) => { 
+          const updateAttendance = useCallback(async (empId, date, status, context) => { 
               setAttendanceData(prev => {
                   const newData = { ...prev };
                   if (!newData[empId]) newData[empId] = {};
@@ -1186,9 +1113,9 @@
                   const taskConfig = taskTypes.find(t => t.id === status);
                   if (taskConfig && taskConfig.targetCategory) movePersonToCategory(empId, taskConfig.targetCategory);
               }
-          };
+          }, [taskTypes, movePersonToCategory, saveData]);
           
-          const batchUpdateAttendance = async (records) => { 
+          const batchUpdateAttendance = useCallback(async (records) => { 
               setAttendanceData(prev => {
                   const newData = { ...prev };
                   records.forEach(r => { if (!newData[r.employee_id]) newData[r.employee_id] = {}; newData[r.employee_id][r.date] = { status: r.status, context: r.context }; });
@@ -1199,13 +1126,11 @@
                   const taskConfig = taskTypes.find(t => t.id === records[0].status);
                   if (taskConfig && taskConfig.targetCategory) movePersonToCategory(records[0].employee_id, taskConfig.targetCategory);
               }
-          };
+          }, [taskTypes, movePersonToCategory, saveData]);
 
           const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes }, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
           const handleImportClick = () => { fileInputRef.current.click(); }
           const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (event) => { try { const imported = JSON.parse(event.target.result); if (confirm("匯入?")) { if (imported.settings) { if (imported.settings.categoryGroups) { setCategoryGroups(imported.settings.categoryGroups); await saveData('categoryGroups', imported.settings.categoryGroups); } if (imported.settings.taskTypes) { setTaskTypes(imported.settings.taskTypes); await saveData('taskTypes', imported.settings.taskTypes); } } if (imported.personnel) { setPersonnel(imported.personnel); await saveData('personnel', imported.personnel); } if (imported.masterCourses) { setMasterCourses(imported.masterCourses); await saveData('masterCourses', imported.masterCourses); } if (imported.attendanceData) { setAttendanceData(imported.attendanceData); await saveData('attendanceData', imported.attendanceData); } if (imported.monthlyData) { await saveData('monthlyData', JSON.stringify(imported.monthlyData)); } alert("Done"); setForceRefresh(p=>p+1); } } catch(e){} }; reader.readAsText(file); e.target.value=''; };
-          const handleSaveCategories = (newGroups) => { setCategoryGroups(newGroups); saveData('categoryGroups', newGroups); setShowCategoryModal(false); };
-          const handleSaveTaskTypes = (newTypes) => { setTaskTypes(newTypes); saveData('taskTypes', newTypes); setShowTaskTypeModal(false); };
 
           const stats = useMemo(() => {
               let allocated = 0; let frontline = 0;
@@ -1216,14 +1141,10 @@
           const studentStats = useMemo(() => { let total = 0; masterCourses.forEach(c => total += (parseInt(c.students) || 0)); return { total }; }, [masterCourses]);
           const dailyStats = useMemo(() => {
               const todayStr = new Date().toISOString().split('T')[0];
-              let workingToday = 0;
-              let leaveToday = 0;
+              let workingToday = 0; let leaveToday = 0;
               Object.values(attendanceData).forEach(records => {
                   const todayRecord = records[todayStr];
-                  if (todayRecord) {
-                      if (todayRecord.status === 'leave' || todayRecord.status === 'sick') leaveToday++;
-                      else workingToday++;
-                  }
+                  if (todayRecord) { if (todayRecord.status === 'leave' || todayRecord.status === 'sick') leaveToday++; else workingToday++; }
               });
               return { workingToday, leaveToday };
           }, [attendanceData]);
@@ -1266,7 +1187,7 @@
                                     <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
                                     <button onClick={() => setShowCourseModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/50"><Icons.Plus /> 新增課程</button>
                                 </div>
-                                <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} />)}</tbody></table></div>
+                                <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} isEditingAllowed={isEditingAllowed} />)}</tbody></table></div>
                             </div>
                             <div>
                                 <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
@@ -1321,6 +1242,7 @@
                         wsShowBatchModal={wsShowBatchModal} setWsShowBatchModal={setWsShowBatchModal}
                         wsBatchForm={wsBatchForm} setWsBatchForm={setWsBatchForm}
                         dailyStats={dailyStats}
+                        isEditingAllowed={isEditingAllowed}
                     />}
                     
                     {currentView === 'personnel' && <PersonnelView 
@@ -1348,6 +1270,7 @@
                         onCatDragStart={onCatDragStart}
                         onCatDrop={onCatDrop}
                         clearDragStates={clearDragStates}
+                        isEditingAllowed={isEditingAllowed}
                     />}
                     
                     {currentView === 'timeline' && <TimelineView masterCourses={masterCourses} />}
@@ -1361,7 +1284,7 @@
             </main>
 
             {/* Modals */}
-            {showCourseModal && (
+            {showCourseModal && isEditingAllowed && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 border border-slate-800">
                         <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增課程計畫</h3><button onClick={() => setShowCourseModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
@@ -1383,7 +1306,7 @@
                 </div>
             )}
             
-            {showCategoryModal && (
+            {showCategoryModal && isEditingAllowed && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 border border-slate-800 max-h-[80vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">管理人員分類</h3><button onClick={() => setShowCategoryModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
@@ -1442,7 +1365,7 @@
                 </div>
             )}
             
-            {showTaskTypeModal && (
+            {showTaskTypeModal && isEditingAllowed && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200 border border-slate-800 max-h-[80vh] overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">管理工作類型</h3><button onClick={() => setShowTaskTypeModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
@@ -1490,7 +1413,7 @@
                 </div>
             )}
             
-            {showDeleteModal && (
+            {showDeleteModal && isEditingAllowed && (
               <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                 <div className="bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-slate-800">
                   <h3 className="font-bold text-lg text-slate-100 mb-2">確認刪除?</h3>
