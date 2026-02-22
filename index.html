@@ -25,75 +25,25 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- 引入 Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
     body { background-color: #020617; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #e2e8f0; }
-    
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    
     .dragging { opacity: 0.5; }
     .header-transition { transition: all 0.3s ease-in-out; }
     .stats-container { transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, margin 0.3s ease-in-out; overflow: hidden; }
     .stats-visible { max-height: 500px; opacity: 1; margin-bottom: 1.5rem; }
     .stats-hidden { max-height: 0; opacity: 0; margin-bottom: 0; }
     .timeline-grid { background-image: linear-gradient(to right, #1e293b 1px, transparent 1px); background-size: 8.33% 100%; }
-    
-    /* Attendance Grid Styles */
-    .attendance-cell {
-      transition: all 0.1s;
-      cursor: pointer;
-      height: 48px; 
-      vertical-align: middle;
-      padding: 2px;
-      border-right: 1px solid #1e293b;
-      border-bottom: 1px solid #1e293b;
-    }
-    .attendance-cell:hover {
-      background-color: #1e293b;
-    }
-    .task-block {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 600;
-      border-radius: 6px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      transition: transform 0.1s, box-shadow 0.1s;
-      padding: 0 4px;
-      position: relative;
-    }
-    .task-block:hover {
-        transform: translateY(-1px);
-        z-index: 20;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-    }
-    .view-month .task-block:hover::after {
-        content: attr(data-tooltip);
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #f1f5f9;
-        color: #0f172a;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 10px;
-        white-space: nowrap;
-        margin-bottom: 4px;
-        pointer-events: none;
-        z-index: 50;
-        font-weight: bold;
-    }
+    .attendance-cell { transition: all 0.1s; cursor: pointer; height: 48px; vertical-align: middle; padding: 2px; border-right: 1px solid #1e293b; border-bottom: 1px solid #1e293b; }
+    .attendance-cell:hover { background-color: #1e293b; }
+    .task-block { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border-radius: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: transform 0.1s, box-shadow 0.1s; padding: 0 4px; position: relative; }
+    .task-block:hover { transform: translateY(-1px); z-index: 20; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); }
+    .view-month .task-block:hover::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background-color: #f1f5f9; color: #0f172a; padding: 4px 8px; border-radius: 4px; font-size: 10px; white-space: nowrap; margin-bottom: 4px; pointer-events: none; z-index: 50; font-weight: bold; }
   </style>
 </head>
 <body class="dark">
@@ -102,55 +52,40 @@
   <script type="text/babel" data-type="module">
     const { useState, useMemo, useEffect, useRef } = React;
 
-    // --- Supabase 配置 ---
     const SUPABASE_URL = 'https://vbhnboegowulvgckjlyg.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_8fAfsHCXZ45iJY6_t4rTLQ_uvJ6Izb2'; 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
     const generateId = () => Math.random().toString(36).substr(2, 9);
 
     // --- Icons ---
     const Icons = {
-      Dashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
-      Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-      Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
-      ClipboardCheck: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>,
-      Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
-      Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-      ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
-      ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
-      ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
-      ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
-      Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19c0-1.7-1.3-3-3-3h-1.1c-.1-2.6-2.1-4.6-4.6-4.8C6 11.3 3.8 13.5 4 16.3c.1 1.5 1.5 2.7 3 2.7h10.5Z"/><path d="M12 3v9"/><path d="m8 8 4-4 4 4"/></svg>,
-      X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
-      Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
-      Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-      Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-      Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Dashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+      Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+      Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+      ClipboardCheck: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>,
+      Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+      Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+      ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>,
+      ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 15-6-6-6 6"/></svg>,
+      ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>,
+      ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>,
+      Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.5 19c0-1.7-1.3-3-3-3h-1.1c-.1-2.6-2.1-4.6-4.6-4.8C6 11.3 3.8 13.5 4 16.3c.1 1.5 1.5 2.7 3 2.7h10.5Z"/><path d="M12 3v9"/><path d="m8 8 4-4 4 4"/></svg>,
+      X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+      Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+      Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+      Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+      Briefcase: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+      List: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+      BarChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
     };
 
-    // --- 預設資料 (若資料庫為空時使用) ---
+    // --- Defaults ---
     const DEFAULT_CATEGORY_GROUPS = [
         { name: '管理', items: [{ id: 'supervisor', label: '主管', type: 'admin' }] },
-        { name: '專項', items: [
-            { id: 'marketing', label: '行銷', type: 'admin' },
-            { id: 'content', label: '內容', type: 'admin' },
-            { id: 'instructor', label: '講師', type: 'teaching' },
-            { id: 'captain', label: '隊長', type: 'frontline' },
-            { id: 'innovation', label: '創新', type: 'admin' }
-        ]},
-        { name: '專案', items: [
-            { id: 'bootcamp', label: '線條訓練營', type: 'frontline' }, 
-            { id: 'camp_color', label: '色彩訓練營', type: 'frontline' },
-            { id: 'sketch', label: '速寫團練', type: 'frontline' },
-            { id: 'monthly', label: '月月繪', type: 'frontline' }
-        ]},
-        { name: '正課', items: [
-            { id: 'regular', label: '透視', type: 'frontline' }, 
-            { id: 'reg_comp', label: '構成', type: 'frontline' },
-            { id: 'reg_color', label: '色彩', type: 'frontline' },
-            { id: 'dlc', label: 'DLC', type: 'frontline' }
-        ]},
+        { name: '專項', items: [{ id: 'marketing', label: '行銷', type: 'admin' }, { id: 'content', label: '內容', type: 'admin' }, { id: 'instructor', label: '講師', type: 'teaching' }, { id: 'captain', label: '隊長', type: 'frontline' }, { id: 'innovation', label: '創新', type: 'admin' }]},
+        { name: '專案', items: [{ id: 'project', label: '專案管理', type: 'admin' }, { id: 'bootcamp', label: '線條訓練營', type: 'frontline' }, { id: 'camp_color', label: '色彩訓練營', type: 'frontline' }, { id: 'sketch', label: '速寫團練', type: 'frontline' }, { id: 'monthly', label: '月月繪', type: 'frontline' }]},
+        { name: '正課', items: [{ id: 'regular', label: '透視', type: 'frontline' }, { id: 'reg_comp', label: '構成', type: 'frontline' }, { id: 'reg_color', label: '色彩', type: 'frontline' }, { id: 'dlc', label: 'DLC', type: 'frontline' }]},
         { name: '待命', items: [{ id: 'pool', label: '尚未分配', type: 'pool' }] }
     ];
 
@@ -176,7 +111,7 @@
 
     // --- Components ---
     const KPICard = ({ title, value, icon, color }) => (
-        <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex items-center gap-4 transition-transform hover:scale-[1.02]">
+        <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex items-center gap-4 hover:scale-[1.02] transition-transform">
             <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
             <div>
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</div>
@@ -194,763 +129,51 @@
             <td className="p-3"><input type="date" value={course.endDate} onChange={e => onUpdate(course.id, 'endDate', e.target.value)} className="bg-transparent border-b border-dashed border-slate-600 focus:border-indigo-400 outline-none w-28 text-sm text-slate-300" /></td>
             <td className="p-3"><input type="number" value={course.students} onChange={e => onUpdate(course.id, 'students', parseInt(e.target.value) || 0)} className="bg-transparent font-bold text-indigo-400 border-b border-dashed border-indigo-900 focus:border-indigo-400 outline-none w-16 text-center" /></td>
             <td className="p-3 text-right">
-                <button onClick={() => onDelete(course.id)} className="text-slate-500 hover:text-rose-500 transition-colors p-1"><Icons.Trash /></button>
+                <button onClick={() => onDelete(course.id)} className="text-slate-500 hover:text-rose-500 p-1"><Icons.Trash /></button>
             </td>
         </tr>
     );
 
-    const App = () => {
-      // --- State ---
-      const [loading, setLoading] = useState(true);
-      const [syncStatus, setSyncStatus] = useState('連線中...');
-      const [currentView, setCurrentView] = useState('dashboard');
-      const [forceRefresh, setForceRefresh] = useState(0); 
-      
-      const [masterCourses, setMasterCourses] = useState([]);
-      const [schedule, setSchedule] = useState([]);
-      const [personnel, setPersonnel] = useState({});
-      const [attendanceData, setAttendanceData] = useState({});
-      
-      // Dynamic Settings
-      const [categoryGroups, setCategoryGroups] = useState(DEFAULT_CATEGORY_GROUPS);
-      const [taskTypes, setTaskTypes] = useState(DEFAULT_TASK_TYPES);
-      
-      const [draggedItem, setDraggedItem] = useState(null);
-      const [dragOverContainer, setDragOverContainer] = useState(null);
-      const [addingToCategory, setAddingToCategory] = useState(null);
-      const [tempName, setTempName] = useState('');
-      
-      const [showCourseModal, setShowCourseModal] = useState(false);
-      const [showDeleteModal, setShowDeleteModal] = useState(false);
-      const [deleteTarget, setDeleteTarget] = useState(null);
-      
-      // Settings Modals
-      const [showCategoryModal, setShowCategoryModal] = useState(false);
-      const [showTaskTypeModal, setShowTaskTypeModal] = useState(false);
-      
-      const [collapsedMonths, setCollapsedMonths] = useState({});
-      const [collapsedPersonnelGroups, setCollapsedPersonnelGroups] = useState({});
-      const [isMasterCollapsed, setIsMasterCollapsed] = useState(false);
-      const [isScrolled, setIsScrolled] = useState(false);
-      const [errorMsg, setErrorMsg] = useState('');
-
-      const [newCourse, setNewCourse] = useState({
-          name: '透視', type: 'regular', batch: '', students: 0, startDate: '', duration: 70, endDate: ''
-      });
-      
-      // Forms for Settings
-      const [newGroupForm, setNewGroupForm] = useState('');
-      const [newCatForm, setNewCatForm] = useState({ groupIdx: 0, label: '', id: '' });
-      const [newTaskForm, setNewTaskForm] = useState({ id: '', label: '', color: 'bg-indigo-600 text-indigo-50 shadow-sm', targetCategory: '' });
-
-      // Work Schedule UI State
-      const [wsSelectedMonth, setWsSelectedMonth] = useState(new Date());
-      const [wsSearchTerm, setWsSearchTerm] = useState("");
-      const [wsViewMode, setWsViewMode] = useState('week'); 
-      const [wsExpandedGroups, setWsExpandedGroups] = useState({});
-      const [wsPopover, setWsPopover] = useState(null);
-      const [wsPopoverContext, setWsPopoverContext] = useState("");
-      const [wsShowBatchModal, setWsShowBatchModal] = useState(false);
-      const [wsBatchForm, setWsBatchForm] = useState({ personId: '', startDate: '', endDate: '', type: 'persp_group', context: '' });
-      
-      const [timelineYear, setTimelineYear] = useState(new Date().getFullYear());
-      const fileInputRef = useRef(null);
-
-      // Flatten categories for lookups
-      const categories = useMemo(() => categoryGroups.flatMap(g => g.items), [categoryGroups]);
-
-      // --- Initialization ---
-      useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 10);
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
-      }, []);
-      
-      useEffect(() => {
-         if (Object.keys(wsExpandedGroups).length === 0 && categoryGroups.length > 0) {
-             setWsExpandedGroups(categoryGroups.reduce((acc, g) => ({...acc, [g.name]: true}), {}));
-         }
-      }, [categoryGroups]);
-
-      // --- Main Data Loading (Safe Fetch) ---
-      useEffect(() => {
-        const initializeData = async () => {
-          setLoading(true);
-          setSyncStatus('同步中...');
-
-          const safeFetch = async (table, options = {}) => {
-              try {
-                const query = supabase.from(table).select('*');
-                if (options.order) query.order(options.order, { ascending: true });
-                const { data, error } = await query;
-                if (error) {
-                    console.warn(`Supabase: 讀取 ${table} 失敗 (${error.code})`);
-                    return null; 
-                }
-                return data || [];
-              } catch (e) {
-                console.warn(`Supabase Exception`, e);
-                return [];
-              }
-          };
-
-          try {
-            const [pData, cData, mData, attData, settingsData] = await Promise.all([
-                safeFetch('personnel'),
-                safeFetch('courses'),
-                safeFetch('monthly_data', { order: 'month_index' }),
-                safeFetch('attendance'),
-                safeFetch('app_settings')
-            ]);
-
-            // 0. Settings (Categories & Tasks)
-            if (settingsData) {
-                const cats = settingsData.find(s => s.key === 'categories');
-                const tasks = settingsData.find(s => s.key === 'task_types');
-                if (cats) setCategoryGroups(cats.value);
-                if (tasks) setTaskTypes(tasks.value);
-            }
-
-            // 1. Personnel
-            if (pData) {
-                const grouped = {};
-                // Re-calculate categories just in case
-                const currentCats = (settingsData?.find(s => s.key === 'categories')?.value || DEFAULT_CATEGORY_GROUPS).flatMap(g => g.items);
-                currentCats.forEach(c => grouped[c.id] = []);
-                pData.forEach(p => {
-                    if (grouped[p.category_id]) grouped[p.category_id].push({ id: p.id, name: p.name });
-                });
-                setPersonnel(grouped);
-            } else {
-                const grouped = {}; categories.forEach(c => grouped[c.id] = []);
-                setPersonnel(grouped);
-            }
-
-            // 2. Courses
-            if (cData) {
-                setMasterCourses(cData.map(c => ({
-                    id: c.id, name: c.name, type: c.type, batch: c.batch,
-                    students: c.students, startDate: c.start_date, endDate: c.end_date, duration: c.duration
-                })));
-            }
-
-            // 3. Schedule
-            const initSchedule = Array.from({ length: 12 }, (_, i) => ({
-                month: `${i + 1}月`,
-                monthly: [{ name: '月月繪', type: 'monthlyActivity', students: mData?.find(m => m.month_index === i)?.students || 0, batch: '常駐' }],
-                early: [], mid: [], late: []
-            }));
-            setSchedule(initSchedule);
-
-            // 4. Attendance
-            if (attData) {
-                const attMap = {};
-                attData.forEach(record => {
-                    if (!attMap[record.employee_id]) attMap[record.employee_id] = {};
-                    attMap[record.employee_id][record.date] = { status: record.status, context: record.context || '' };
-                });
-                setAttendanceData(attMap);
-            }
-
-            setSyncStatus('✅ 已同步');
-          } catch (err) {
-            console.error("Init Error", err);
-            setSyncStatus('⚠️ 部分功能受限');
-          } finally {
-            setLoading(false);
-          }
+    const TimelineView = ({ masterCourses }) => {
+        const [year, setYear] = useState(new Date().getFullYear());
+        const months = Array.from({length: 12}, (_, i) => i + 1);
+        const getCourseColor = (type) => {
+            if (type === 'regular') return 'bg-blue-600 text-white';
+            if (type === 'sketch') return 'bg-orange-600 text-white';
+            if (type === 'camp30') return 'bg-emerald-600 text-white';
+            return 'bg-slate-600 text-white';
         };
-        initializeData();
-      }, [forceRefresh]);
-
-      // --- Schedule Logic ---
-      useEffect(() => {
-          setSchedule(prev => {
-              const newSchedule = prev.length > 0 ? JSON.parse(JSON.stringify(prev)) : [];
-              if(newSchedule.length===0) return [];
-              newSchedule.forEach(m => { m.early = []; m.mid = []; m.late = []; });
-              masterCourses.forEach(course => {
-                  if (!course.startDate || !course.endDate) return;
-                  const start = new Date(course.startDate);
-                  const end = new Date(course.endDate);
-                  for (let m = 0; m < 12; m++) {
-                      const periods = [{ key: 'early', s: 1, e: 10 }, { key: 'mid', s: 11, e: 20 }, { key: 'late', s: 21, e: 31 }];
-                      periods.forEach(p => {
-                          const testStart = new Date(start.getFullYear(), m, p.s);
-                          const testEnd = new Date(start.getFullYear(), m, p.e);
-                          if (start <= testEnd && end >= testStart) {
-                              newSchedule[m][p.key].push({ name: course.name, type: course.type, students: course.students, batch: course.batch });
-                          }
-                      });
-                  }
-              });
-              return newSchedule;
-          });
-      }, [masterCourses]);
-
-      // --- Helpers & DB ---
-      const calculateEndDate = (startStr, days) => {
-          if (!startStr || !days) return '';
-          const d = new Date(startStr);
-          d.setDate(d.getDate() + parseInt(days) - 1);
-          return d.toISOString().split('T')[0];
-      };
-      
-      const syncDB = async (table, data, deleteFilter = {}) => {
-        setSyncStatus('同步中...');
-        try {
-            if (table === 'personnel') {
-                await supabase.from('personnel').delete().neq('id', '0');
-                const records = [];
-                Object.entries(data).forEach(([catId, list]) => list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name })));
-                if(records.length) await supabase.from('personnel').insert(records);
-            }
-            else if (table === 'courses') {
-                await supabase.from('courses').delete().neq('id', '0');
-                const records = data.map(c => ({
-                    id: c.id, name: c.name, type: c.type, batch: c.batch,
-                    students: c.students, start_date: c.startDate, end_date: c.endDate, duration: c.duration
-                }));
-                if(records.length) await supabase.from('courses').insert(records);
-            }
-            else if (table === 'monthly_data') {
-                await supabase.from('monthly_data').delete().neq('id', '0');
-                const records = data.map((m, i) => ({ month_index: i, students: m[0]?.students || 0 }));
-                if(records.length) await supabase.from('monthly_data').insert(records);
-            }
-            // Generic Settings Sync
-            else if (table === 'app_settings') {
-                // data format: { key: 'categories', value: [...] }
-                const { error } = await supabase.from('app_settings').upsert(data);
-                if (error) throw error;
-            }
-            setSyncStatus('✅ 已同步');
-        } catch(e) { console.error(e); setSyncStatus('❌ 失敗'); }
-      };
-
-      const movePersonToCategory = (empId, taskType) => {
-          const taskConfig = taskTypes.find(t => t.id === taskType);
-          if (!taskConfig || !taskConfig.targetCategory) return; 
-
-          const targetCatId = taskConfig.targetCategory;
-          let currentCatId = null;
-          let personObj = null;
-
-          for (const [catId, list] of Object.entries(personnel)) {
-              const found = list.find(p => p.id === empId);
-              if (found) {
-                  currentCatId = catId;
-                  personObj = found;
-                  break;
-              }
-          }
-
-          if (personObj && currentCatId && currentCatId !== targetCatId) {
-              const newPersonnel = { ...personnel };
-              newPersonnel[currentCatId] = newPersonnel[currentCatId].filter(p => p.id !== empId);
-              if (!newPersonnel[targetCatId]) newPersonnel[targetCatId] = [];
-              newPersonnel[targetCatId] = [...newPersonnel[targetCatId], personObj];
-              setPersonnel(newPersonnel);
-              syncDB('personnel', newPersonnel);
-          }
-      };
-      
-      const updateAttendance = async (empId, date, status, context) => {
-          const newData = { ...attendanceData };
-          if (!newData[empId]) newData[empId] = {};
-          
-          if (!status) delete newData[empId][date]; 
-          else newData[empId][date] = { status, context };
-          
-          setAttendanceData(newData);
-          setSyncStatus('同步中...');
-          
-          if (status) movePersonToCategory(empId, status);
-          
-          try {
-            if (!status) {
-                await supabase.from('attendance').delete().match({ employee_id: empId, date: date });
-            } else {
-                await supabase.from('attendance').upsert({ employee_id: empId, date: date, status: status, context: context }, { onConflict: 'employee_id, date' });
-            }
-            setSyncStatus('✅ 已同步');
-          } catch(e) { setSyncStatus('❌ 儲存失敗'); }
-      };
-      
-      const batchUpdateAttendance = async (records) => {
-          setSyncStatus('批量更新中...');
-          const newData = { ...attendanceData };
-          records.forEach(r => {
-             if (!newData[r.employee_id]) newData[r.employee_id] = {};
-             newData[r.employee_id][r.date] = { status: r.status, context: r.context };
-          });
-          setAttendanceData(newData);
-
-          if (records.length > 0) {
-             const firstRecord = records[0];
-             movePersonToCategory(firstRecord.employee_id, firstRecord.status);
-          }
-
-          try {
-             const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id, date' });
-             if (error) throw error;
-             setSyncStatus('✅ 批量完成');
-          } catch(e) { console.error(e); setSyncStatus('❌ 批量失敗'); }
-      };
-
-      // --- Settings Handlers ---
-      const handleSaveCategories = (newGroups) => {
-          setCategoryGroups(newGroups);
-          syncDB('app_settings', { key: 'categories', value: newGroups });
-          // Ensure personnel state has keys
-          const newCats = newGroups.flatMap(g=>g.items);
-          setPersonnel(prev => {
-              const next = {...prev};
-              newCats.forEach(c => { if(!next[c.id]) next[c.id] = []; });
-              return next;
-          });
-          setShowCategoryModal(false);
-      };
-
-      const handleSaveTaskTypes = (newTypes) => {
-          setTaskTypes(newTypes);
-          syncDB('app_settings', { key: 'task_types', value: newTypes });
-          setShowTaskTypeModal(false);
-      };
-
-      // --- Export / Import Handlers ---
-      const handleExport = () => {
-          const data = {
-              personnel,
-              masterCourses,
-              attendanceData,
-              monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })),
-              settings: { categoryGroups, taskTypes }, // Export custom settings
-              timestamp: new Date().toISOString()
-          };
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `manpower_backup_${new Date().toISOString().split('T')[0]}.json`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-      };
-
-      const handleImportClick = () => {
-          fileInputRef.current.click();
-      };
-
-      const handleFileChange = (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-              try {
-                  const imported = JSON.parse(event.target.result);
-                  if (confirm("匯入將會覆蓋目前的資料並上傳至雲端，確定要繼續嗎？")) {
-                      setLoading(true);
-                      setSyncStatus('匯入中...');
-                      
-                      if (imported.settings) {
-                          if (imported.settings.categoryGroups) {
-                              setCategoryGroups(imported.settings.categoryGroups);
-                              await syncDB('app_settings', { key: 'categories', value: imported.settings.categoryGroups });
-                          }
-                          if (imported.settings.taskTypes) {
-                              setTaskTypes(imported.settings.taskTypes);
-                              await syncDB('app_settings', { key: 'task_types', value: imported.settings.taskTypes });
-                          }
-                      }
-
-                      if (imported.personnel) {
-                          setPersonnel(imported.personnel);
-                          await syncDB('personnel', imported.personnel);
-                      }
-                      if (imported.masterCourses) {
-                          setMasterCourses(imported.masterCourses);
-                          await syncDB('courses', imported.masterCourses);
-                      }
-                      if (imported.attendanceData) {
-                          setAttendanceData(imported.attendanceData);
-                          const flatAtt = [];
-                          Object.entries(imported.attendanceData).forEach(([eid, dates]) => {
-                              Object.entries(dates).forEach(([date, val]) => {
-                                  flatAtt.push({ employee_id: eid, date: date, status: val.status, context: val.context });
-                              });
-                          });
-                          if(flatAtt.length) await batchUpdateAttendance(flatAtt);
-                      }
-                      if (imported.monthlyData) {
-                         await syncDB('monthly_data', []); 
-                         const monthlyRecords = imported.monthlyData.map(m => ({ month_index: m.month_index, students: m.students }));
-                         if(monthlyRecords.length) await supabase.from('monthly_data').upsert(monthlyRecords);
-                         setSchedule(prev => prev.map((m,i) => {
-                             const found = imported.monthlyData.find(d => d.month_index === i || parseInt(m.month) === d.month_index);
-                             if(found) m.monthly[0].students = found.students;
-                             return m;
-                         }));
-                      }
-
-                      setLoading(false);
-                      setSyncStatus('✅ 匯入完成');
-                      alert("資料匯入成功！請重新整理頁面以確保顯示正確。");
-                      setForceRefresh(p => p + 1);
-                  }
-              } catch (err) {
-                  console.error(err);
-                  alert("檔案格式錯誤");
-                  setLoading(false);
-              }
-          };
-          reader.readAsText(file);
-          e.target.value = ''; 
-      };
-
-      // --- Handlers ---
-      const handleAddCourse = () => {
-          if (!newCourse.name || !newCourse.startDate) { setErrorMsg("請填寫必要資訊"); return; }
-          const updated = [...masterCourses, { ...newCourse, id: generateId() }];
-          setMasterCourses(updated);
-          syncDB('courses', updated);
-          setNewCourse({ ...newCourse, batch: '', students: 0, startDate: '', endDate: '' });
-          setShowCourseModal(false);
-          setErrorMsg('');
-      };
-      const handleUpdateCourse = (id, field, val) => {
-          const updated = masterCourses.map(c => {
-              if (c.id !== id) return c;
-              const nc = { ...c, [field]: val };
-              if (field === 'startDate') nc.endDate = calculateEndDate(val, nc.duration);
-              if (field === 'duration') nc.endDate = calculateEndDate(nc.startDate, val);
-              if (field === 'endDate') nc.duration = calculateDuration(nc.startDate, val);
-              return nc;
-          });
-          setMasterCourses(updated);
-          syncDB('courses', updated);
-      };
-      const handleDeleteCourse = (id) => {
-          if (!confirm("確定刪除？")) return;
-          const updated = masterCourses.filter(c => c.id !== id);
-          setMasterCourses(updated);
-          syncDB('courses', updated);
-      };
-      const handleMonthlyChange = (mIdx, val) => {
-          const newSched = [...schedule];
-          newSched[mIdx].monthly[0].students = val;
-          setSchedule(newSched);
-          syncDB('monthly_data', newSchedule.map(m => m.monthly));
-      };
-      const handleConfirmAddPerson = () => {
-          if (!tempName.trim() || !addingToCategory) return;
-          const newP = { id: generateId(), name: tempName.trim() };
-          const newPersonnel = { ...personnel, [addingToCategory]: [...(personnel[addingToCategory] || []), newP] };
-          setPersonnel(newPersonnel);
-          syncDB('personnel', newPersonnel);
-          setTempName('');
-          setAddingToCategory(null);
-      };
-      const handleRemovePerson = () => {
-          if (!deleteTarget) return;
-          const newPersonnel = { ...personnel };
-          newPersonnel[deleteTarget.categoryId] = newPersonnel[deleteTarget.categoryId].filter(p => p.id !== deleteTarget.personId);
-          setPersonnel(newPersonnel);
-          syncDB('personnel', newPersonnel);
-          setShowDeleteModal(false);
-      };
-      const onDragStart = (e, person, fromCategory) => {
-          setDraggedItem({ person, fromCategory });
-          e.dataTransfer.effectAllowed = 'move';
-      };
-      const onDragOver = (e, catId) => {
-          e.preventDefault();
-          if (dragOverContainer !== catId) setDragOverContainer(catId);
-      };
-      const onDrop = (e, toCategory) => {
-          e.preventDefault();
-          setDragOverContainer(null);
-          if (!draggedItem || draggedItem.fromCategory === toCategory) return;
-          const newPersonnel = { ...personnel };
-          newPersonnel[draggedItem.fromCategory] = newPersonnel[draggedItem.fromCategory].filter(p => p.id !== draggedItem.person.id);
-          newPersonnel[toCategory] = [...(newPersonnel[toCategory] || []), draggedItem.person];
-          setPersonnel(newPersonnel);
-          syncDB('personnel', newPersonnel);
-          setDraggedItem(null);
-      };
-      const handleWsChangeMonth = (delta) => {
-          const newDate = new Date(wsSelectedMonth);
-          newDate.setMonth(newDate.getMonth() + delta);
-          setWsSelectedMonth(newDate);
-      };
-      const handleWsCellClick = (e, empId, dateStr, context) => {
-          const rect = e.target.getBoundingClientRect();
-          setWsPopover({ empId, dateStr, x: rect.left, y: rect.bottom + window.scrollY });
-          setWsPopoverContext(context || "");
-      };
-      const handleWsSaveCell = (status) => {
-          if (wsPopover) {
-              updateAttendance(wsPopover.empId, wsPopover.dateStr, status, wsPopoverContext);
-              setWsPopover(null);
-              setWsPopoverContext("");
-          }
-      };
-      const handleWsBatchSubmit = () => {
-          if (!wsBatchForm.personId || !wsBatchForm.startDate || !wsBatchForm.endDate) { alert("請填寫完整資訊"); return; }
-          const start = new Date(wsBatchForm.startDate);
-          const end = new Date(wsBatchForm.endDate);
-          const records = [];
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-              records.push({
-                  employee_id: wsBatchForm.personId,
-                  date: d.toISOString().split('T')[0],
-                  status: wsBatchForm.type,
-                  context: wsBatchForm.context
-              });
-          }
-          batchUpdateAttendance(records);
-          setWsShowBatchModal(false);
-          setWsBatchForm({ personId: '', startDate: '', endDate: '', type: 'persp_group', context: '' });
-      };
-
-      // Stats Logic
-      const stats = useMemo(() => {
-          let allocated = 0; let frontline = 0;
-          categories.forEach(c => {
-              const count = personnel[c.id]?.length || 0;
-              if (c.id !== 'pool') allocated += count;
-              if (c.type === 'frontline') frontline += count;
-          });
-          const total = allocated + (personnel['pool']?.length || 0);
-          return { total, allocated, unallocated: total - allocated, frontline };
-      }, [personnel, categories]);
-      const studentStats = useMemo(() => {
-          let total = 0;
-          masterCourses.forEach(c => total += (parseInt(c.students) || 0));
-          return { total };
-      }, [masterCourses]);
-      
-      const dailyStats = useMemo(() => {
-          const todayStr = new Date().toISOString().split('T')[0];
-          let workingToday = 0;
-          let leaveToday = 0;
-          Object.values(attendanceData).forEach(records => {
-              const todayRecord = records[todayStr];
-              if (todayRecord) {
-                  if (todayRecord.status === 'leave') leaveToday++;
-                  else workingToday++;
-              }
-          });
-          return { workingToday, leaveToday };
-      }, [attendanceData]);
-
-      // --- Variables for Render ---
-      const datesToShow = useMemo(() => {
-          if (wsViewMode === 'month') {
-              const year = wsSelectedMonth.getFullYear();
-              const month = wsSelectedMonth.getMonth();
-              const daysInMonth = new Date(year, month + 1, 0).getDate();
-              return Array.from({length: daysInMonth}, (_, i) => new Date(year, month, i + 1));
-          } else {
-              const start = new Date(wsSelectedMonth);
-              const day = start.getDay();
-              start.setDate(start.getDate() - day); 
-              return Array.from({length: 7}, (_, i) => {
-                  const d = new Date(start);
-                  d.setDate(start.getDate() + i);
-                  return d;
-              });
-          }
-      }, [wsViewMode, wsSelectedMonth]);
-      
-      const wsTitle = wsViewMode === 'month' 
-             ? `${wsSelectedMonth.getFullYear()}年 ${wsSelectedMonth.getMonth()+1}月`
-             : `${datesToShow[0].getMonth()+1}/${datesToShow[0].getDate()} - ${datesToShow[6].getMonth()+1}/${datesToShow[6].getDate()}`;
-             
-      const wsFilteredGroups = useMemo(() => {
-          return categoryGroups.map(g => {
-              const filteredItems = g.items.map(cat => ({
-                  ...cat,
-                  people: (personnel[cat.id] || []).filter(p => p.name.includes(wsSearchTerm))
-              })).filter(cat => cat.people.length > 0);
-              return { ...g, items: filteredItems };
-          }).filter(g => g.items.length > 0);
-      }, [categoryGroups, personnel, wsSearchTerm]);
-      
-      const getTimelineCourseColor = (type) => {
-          if (type === 'regular') return 'bg-blue-600 text-white';
-          if (type === 'sketch') return 'bg-orange-600 text-white';
-          if (type === 'camp30') return 'bg-emerald-600 text-white';
-          return 'bg-slate-600 text-white';
-      };
-      
-      const getDayOfYear = (date) => {
-        const start = new Date(date.getFullYear(), 0, 0);
-        const diff = date - start;
-        const oneDay = 1000 * 60 * 60 * 24;
-        return Math.floor(diff / oneDay);
-      };
-
-      // --- Views (Inline Definition) ---
-      
-      const WorkScheduleView = (
-              <div className="fade-in space-y-4 pb-20">
-                  <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
-                      <div className="flex items-center gap-4">
-                          <button onClick={() => handleWsChangeMonth(-1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronLeft /></button>
-                          <div className="text-lg font-bold text-slate-100 min-w-[120px] text-center">{wsTitle}</div>
-                          <button onClick={() => handleWsChangeMonth(1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronRight /></button>
-                      </div>
-                      <div className="flex gap-2">
-                          <button onClick={() => setWsViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'week' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>週檢視</button>
-                          <button onClick={() => setWsViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${wsViewMode === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>月檢視</button>
-                      </div>
-                      <div className="flex items-center gap-4">
-                           <button onClick={() => setShowTaskTypeModal(true)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-900 px-2 py-1 rounded">⚙️ 設定</button>
-                           <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md shadow-indigo-900/50"><Icons.Plus /> 新增紀錄</button>
-                           <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"><Icons.Search /><input className="bg-transparent border-none outline-none text-sm w-32 text-slate-200" placeholder="搜尋姓名..." value={wsSearchTerm} onChange={e => setWsSearchTerm(e.target.value)} /></div>
-                           <div className="flex gap-4 text-xs font-medium text-slate-400">
-                               <span>今日工作: <span className="text-blue-400 font-bold">{dailyStats.workingToday}</span></span>
-                               <span>休假: <span className="text-rose-400 font-bold">{dailyStats.leaveToday}</span></span>
-                           </div>
-                      </div>
-                  </div>
-
-                  <div className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden relative ${wsViewMode === 'month' ? 'view-month' : ''}`}>
-                      <div className="overflow-x-auto">
-                          <table className="w-full text-xs border-collapse table-fixed">
-                              <thead>
-                                  <tr>
-                                      <th className="sticky left-0 bg-slate-900 z-20 border-b border-r border-slate-800 p-3 w-[150px] text-left font-bold text-slate-300">人員</th>
-                                      {datesToShow.map(d => {
-                                          const dayName = ['日','一','二','三','四','五','六'][d.getDay()];
-                                          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                          return (
-                                              <th key={d.toISOString()} className={`border-b border-r border-slate-800 p-1 text-center font-medium ${isWeekend ? 'bg-slate-800/50 text-rose-300' : 'text-slate-400'}`} style={{width: wsViewMode==='week' ? '12%' : '36px'}}>
-                                                  <div className="text-[10px]">{d.getMonth()+1}/{d.getDate()}</div>
-                                                  <div className="text-[9px]">({dayName})</div>
-                                              </th>
-                                          );
-                                      })}
-                                  </tr>
-                              </thead>
-                              <tbody>
-                                  {wsFilteredGroups.map(group => (
-                                      <React.Fragment key={group.name}>
-                                          <tr className="bg-slate-800/50 cursor-pointer hover:bg-slate-800" onClick={() => setWsExpandedGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
-                                              <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 font-bold text-indigo-400 pl-4 flex items-center gap-2" colSpan={datesToShow.length + 1}>{wsExpandedGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>} {group.name}</td>
-                                          </tr>
-                                          {wsExpandedGroups[group.name] && group.items.map(cat => (
-                                              cat.people.map(p => (
-                                                  <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
-                                                      <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 pl-6 font-medium text-slate-300 shadow-sm"><div className="flex items-center justify-between"><span>{p.name}</span><span className="text-[9px] text-slate-400 bg-slate-800 px-1 rounded border border-slate-700">{cat.label}</span></div></td>
-                                                      {datesToShow.map(d => {
-                                                          const dateStr = d.toISOString().split('T')[0];
-                                                          const record = attendanceData[p.id]?.[dateStr];
-                                                          const statusConfig = taskTypes.find(t => t.id === record?.status);
-                                                          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                                          return (
-                                                              <td key={dateStr} onClick={(e) => handleWsCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''}`}>
-                                                                  {statusConfig ? (
-                                                                      <div className={`task-block ${statusConfig.color}`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
-                                                                          {wsViewMode === 'week' ? (record.context || statusConfig.label) : (record.context ? record.context.substring(0,2) : statusConfig.label.substring(0,1))}
-                                                                      </div>
-                                                                  ) : <div className="w-full h-full opacity-0 hover:opacity-100 text-slate-600 text-[10px] flex items-center justify-center">+</div>}
-                                                              </td>
-                                                          );
-                                                      })}
-                                                  </tr>
-                                              ))
-                                          ))}
-                                      </React.Fragment>
-                                  ))}
-                              </tbody>
-                          </table>
-                      </div>
-                      
-                      {/* Popover */}
-                      {wsPopover && (
-                          <div className="fixed z-50 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: wsPopover.y + 5, left: Math.min(wsPopover.x - 60, window.innerWidth - 200) }}>
-                              <input type="text" placeholder="工作內容..." className="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 mb-1 outline-none focus:border-indigo-500 text-slate-200" autoFocus value={wsPopoverContext} onChange={e => setWsPopoverContext(e.target.value)} />
-                              <div className="grid grid-cols-2 gap-1.5">{taskTypes.map(type => (<button key={type.id} onClick={() => handleWsSaveCell(type.id)} className={`text-[10px] px-2 py-1.5 rounded text-center font-bold shadow-sm ${type.color} opacity-90 hover:opacity-100`}>{type.label}</button>))}</div>
-                              <div className="h-px bg-slate-700 my-1"></div>
-                              <button onClick={() => handleWsSaveCell(null)} className="text-xs px-2 py-1.5 rounded text-center font-medium text-slate-400 hover:bg-slate-700 w-full">清除紀錄</button>
-                              <div className="fixed inset-0 z-[-1]" onClick={() => setWsPopover(null)}></div>
-                          </div>
-                      )}
-                  </div>
-                  
-                  {/* Batch Modal */}
-                  {wsShowBatchModal && (
-                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                          <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-800">
-                              <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增紀錄</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
-                              <div className="space-y-4">
-                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">人員</label><select className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" value={wsBatchForm.personId} onChange={e => setWsBatchForm({...wsBatchForm, personId: e.target.value})}><option value="">請選擇...</option>{categoryGroups.map(g => (<optgroup key={g.name} label={g.name}>{g.items.map(cat => personnel[cat.id]?.map(p => <option key={p.id} value={p.id}>{p.name} ({cat.label})</option>))}</optgroup>))}</select></div>
-                                  <div className="grid grid-cols-2 gap-4">
-                                      <div><label className="block text-xs font-bold text-slate-400 mb-1">開始</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.startDate} onChange={e => setWsBatchForm({...wsBatchForm, startDate: e.target.value})} /></div>
-                                      <div><label className="block text-xs font-bold text-slate-400 mb-1">結束</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.endDate} onChange={e => setWsBatchForm({...wsBatchForm, endDate: e.target.value})} /></div>
-                                  </div>
-                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">類型</label><div className="flex flex-wrap gap-2">{taskTypes.map(t => (<button key={t.id} onClick={() => setWsBatchForm({...wsBatchForm, type: t.id})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shadow-sm ${wsBatchForm.type === t.id ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-80 border-transparent'} ${t.color}`}>{t.label}</button>))}</div></div>
-                                  <div><label className="block text-xs font-bold text-slate-400 mb-1">內容/備註</label><input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" placeholder="S1助教、備課..." value={wsBatchForm.context} onChange={e => setWsBatchForm({...wsBatchForm, context: e.target.value})} /></div>
-                                  <button onClick={handleWsBatchSubmit} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg mt-2">確認</button>
-                              </div>
-                          </div>
-                      </div>
-                  )}
-              </div>
-      );
-      
-      const TimelineView = (
-            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto">
+        return (
+            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto fade-in">
                 <div className="min-w-[800px]">
                     <div className="flex items-center justify-between mb-4 px-2">
-                        <button onClick={() => setTimelineYear(y => y - 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>
-                        <h2 className="text-lg font-bold text-slate-100">{timelineYear} 年課程時間軸</h2>
-                        <button onClick={() => setTimelineYear(y => y + 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronRight /></button>
+                        <button onClick={() => setYear(y => y - 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>
+                        <h2 className="text-lg font-bold text-slate-100">{year} 年課程時間軸</h2>
+                        <button onClick={() => setYear(y => y + 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronRight /></button>
                     </div>
                     <div className="flex border-b border-slate-800 pb-2 mb-2 sticky top-0 bg-slate-900 z-10">
-                        {Array.from({length: 12}, (_, i) => i + 1).map(m => (<div key={m} className="flex-1 text-center text-xs font-bold text-slate-400 border-r border-slate-800 last:border-0">{m}月</div>))}
+                        {months.map(m => (<div key={m} className="flex-1 text-center text-xs font-bold text-slate-400 border-r border-slate-800 last:border-0">{m}月</div>))}
                     </div>
                     <div className="space-y-3 relative h-[500px] overflow-y-auto">
-                        <div className="absolute inset-0 flex pointer-events-none z-0">
-                             {Array.from({length: 12}, (_, i) => i + 1).map(m => <div key={m} className="flex-1 border-r border-slate-800 last:border-0 h-full"></div>)}
-                        </div>
+                        <div className="absolute inset-0 flex pointer-events-none z-0">{months.map(m => <div key={m} className="flex-1 border-r border-slate-800 last:border-0 h-full"></div>)}</div>
                         {masterCourses.length === 0 && <div className="text-center text-slate-600 py-10">尚無課程資料</div>}
                         {masterCourses.sort((a,b) => new Date(a.startDate) - new Date(b.startDate)).map(course => {
                             if (!course.startDate || !course.endDate) return null;
                             const start = new Date(course.startDate);
                             const end = new Date(course.endDate);
-                            if (start.getFullYear() !== timelineYear && end.getFullYear() !== timelineYear) return null;
-                            const yearStart = new Date(timelineYear, 0, 1).getTime();
-                            const yearEnd = new Date(timelineYear, 11, 31).getTime();
-                            const yearDuration = yearEnd - yearStart;
+                            if (start.getFullYear() !== year && end.getFullYear() !== year) return null;
+                            const yearStart = new Date(year, 0, 1).getTime();
+                            const yearEnd = new Date(year, 11, 31).getTime();
+                            const duration = yearEnd - yearStart;
                             const cStart = Math.max(start.getTime(), yearStart);
                             const cEnd = Math.min(end.getTime(), yearEnd);
                             if (cEnd < cStart) return null;
-                            const left = ((cStart - yearStart) / yearDuration) * 100;
-                            const width = ((cEnd - cStart) / yearDuration) * 100;
-                            
-                            const getCourseColor = (type) => {
-                              if (type === 'regular') return 'bg-blue-600 text-white';
-                              if (type === 'sketch') return 'bg-orange-600 text-white';
-                              if (type === 'camp30') return 'bg-emerald-600 text-white';
-                              return 'bg-slate-600 text-white';
-                            };
-
+                            const left = ((cStart - yearStart) / duration) * 100;
+                            const width = ((cEnd - cStart) / duration) * 100;
                             return (
                                 <div key={course.id} className="relative h-8 z-10 hover:z-20 group">
-                                    <div className={`absolute h-6 rounded-md shadow-sm text-[10px] flex items-center px-2 cursor-pointer transition-all hover:scale-105 ${getCourseColor(course.type)}`}
-                                        style={{ left: `${left}%`, width: `${width}%`, minWidth: '40px' }}
-                                        title={`${course.name} (${course.startDate} ~ ${course.endDate})`}>
+                                    <div className={`absolute h-6 rounded-md shadow-sm text-[10px] flex items-center px-2 cursor-pointer transition-all hover:scale-105 ${getCourseColor(course.type)}`} style={{ left: `${left}%`, width: `${width}%`, minWidth: '40px' }} title={course.name}>
                                         <span className="truncate font-bold">{course.name} {course.batch && `(${course.batch})`}</span>
-                                        <div className="hidden group-hover:block absolute bottom-full left-0 mb-1 bg-slate-900 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap z-50 border border-slate-700">
-                                            <div className="font-bold text-sm">{course.name}</div>
-                                            <div>期數: {course.batch || '-'}</div>
-                                            <div>日期: {course.startDate} ~ {course.endDate}</div>
-                                            <div>人數: {course.students}</div>
-                                        </div>
                                     </div>
                                 </div>
                             );
@@ -958,136 +181,1111 @@
                     </div>
                 </div>
             </div>
-      );
+        );
+    };
 
-      if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-400 font-medium">載入中...</div>;
+    const ProjectManagementView = ({ personnel, allPersonnelList, masterCourses, projects, setProjects, projectTasks, setProjectTasks, onAssignPerson, onDeleteCourse }) => {
+        const [selectedProject, setSelectedProject] = useState(null);
+        const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+        const [newProj, setNewProj] = useState({ name: '', description: '', status: 'planning', start_date: '', end_date: '' });
+        const [newTask, setNewTask] = useState({ title: '', assignee_id: '', status: 'todo' });
+        const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'gantt'
+        const [ganttYear, setGanttYear] = useState(new Date().getFullYear());
 
-      return (
-        <div className="flex min-h-screen">
-            {/* Sidebar */}
-            <nav className="fixed md:relative bottom-0 w-full md:w-64 bg-slate-900 border-t md:border-r border-slate-800 z-50 flex md:flex-col justify-around md:justify-start p-2 md:p-6 md:space-y-6 shadow-lg md:shadow-none">
-                <div className="hidden md:flex items-center gap-3 px-2 mb-4">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div>
-                    <span className="font-black text-xl text-slate-100 tracking-tight">人力儀表板</span>
-                </div>
-                <button onClick={() => setCurrentView('dashboard')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'dashboard' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Dashboard /> <span className="hidden md:inline">儀表板</span></button>
-                <button onClick={() => setCurrentView('attendance')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'attendance' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.ClipboardCheck /> <span className="hidden md:inline">工作班表</span></button>
-                <button onClick={() => setCurrentView('timeline')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'timeline' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Calendar /> <span className="hidden md:inline">課程時間軸</span></button>
-                <button onClick={() => setCurrentView('personnel')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'personnel' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Users /> <span className="hidden md:inline">人員名單</span></button>
-                <div className="hidden md:block mt-auto pt-6 border-t border-slate-800">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 px-4 mb-2"><Icons.Cloud /> <span>{syncStatus}</span></div>
-                    <button onClick={() => setForceRefresh(p=>p+1)} className="w-full text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 py-2 rounded text-center">重新整理</button>
-                    <div className="grid grid-cols-2 gap-2 px-1 mt-2">
-                        <button onClick={handleExport} className="flex items-center justify-center gap-1 text-xs bg-slate-800 hover:bg-indigo-900 text-slate-300 py-2 rounded transition-colors" title="匯出備份"><Icons.Download /> 匯出</button>
-                        <button onClick={handleImportClick} className="flex items-center justify-center gap-1 text-xs bg-slate-800 hover:bg-emerald-900 text-slate-300 py-2 rounded transition-colors" title="匯入還原"><Icons.Upload /> 匯入</button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+        const combinedProjects = useMemo(() => {
+            const coursesAsProjects = masterCourses.map(c => ({
+                id: c.id,
+                name: `${c.name} ${c.batch || ''}`.trim(),
+                description: `課程天數: ${c.duration}天 | 預估人數: ${c.students}人`,
+                status: 'active',
+                start_date: c.startDate,
+                end_date: c.endDate,
+                isCourse: true,
+                type: c.type
+            }));
+            const customProjects = projects.map(p => ({
+                ...p,
+                isCourse: false
+            }));
+            return [...coursesAsProjects, ...customProjects].sort((a,b) => new Date(a.start_date||0) - new Date(b.start_date||0));
+        }, [masterCourses, projects]);
+
+        const handleCreateProject = async () => {
+            if (!newProj.name) return;
+            const p = { ...newProj, id: generateId(), status: 'planning' };
+            setProjects(prev => [...prev, p]); // Optimistic update
+            setShowAddProjectModal(false);
+            setNewProj({ name: '', description: '', status: 'planning', start_date: '', end_date: '' });
+            await supabase.from('projects').insert(p);
+        };
+
+        const handleAddTask = async () => {
+            if (!newTask.title || !selectedProject) return;
+            const t = { ...newTask, id: generateId(), project_id: selectedProject.id };
+            
+            setProjectTasks(prev => [...prev, t]); // Optimistic update
+            
+            // Automatically move person to "Project" category if assigned
+            if (newTask.assignee_id) {
+                onAssignPerson(newTask.assignee_id, 'project'); 
+            }
+
+            setNewTask({ title: '', assignee_id: '', status: 'todo' });
+            await supabase.from('project_tasks').insert(t);
+        };
+
+        const handleTaskStatusChange = async (taskId, newStatus) => {
+            setProjectTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+            await supabase.from('project_tasks').update({ status: newStatus }).eq('id', taskId);
+        };
+
+        const handleDeleteTask = async (taskId) => {
+            if(!confirm('刪除任務?')) return;
+            setProjectTasks(prev => prev.filter(t => t.id !== taskId));
+            await supabase.from('project_tasks').delete().eq('id', taskId);
+        };
+
+        const handleDeleteProject = async (projId) => {
+             if(!confirm('刪除專案及其所有任務?')) return;
+             setProjects(prev => prev.filter(p => p.id !== projId));
+             setProjectTasks(prev => prev.filter(t => t.project_id !== projId));
+             if(selectedProject && selectedProject.id === projId) setSelectedProject(null);
+             
+             await supabase.from('projects').delete().eq('id', projId);
+             await supabase.from('project_tasks').delete().eq('project_id', projId);
+        };
+
+        const activeProjectTasks = projectTasks.filter(t => selectedProject && t.project_id === selectedProject.id);
+
+        const renderGantt = () => {
+            const months = Array.from({length: 12}, (_, i) => i + 1);
+            const getProjColor = (p) => {
+                if (!p.isCourse) return 'bg-purple-600 text-white';
+                if (p.type === 'regular') return 'bg-blue-600 text-white';
+                if (p.type === 'sketch') return 'bg-orange-600 text-white';
+                if (p.type === 'camp30') return 'bg-emerald-600 text-white';
+                return 'bg-slate-600 text-white';
+            };
+
+            return (
+                <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 overflow-x-auto fade-in">
+                    <div className="min-w-[800px]">
+                        <div className="flex items-center justify-between mb-4 px-2">
+                            <button onClick={() => setGanttYear(y => y - 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>
+                            <h2 className="text-lg font-bold text-slate-100">{ganttYear} 年專案與課程甘特圖</h2>
+                            <button onClick={() => setGanttYear(y => y + 1)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Icons.ChevronRight /></button>
+                        </div>
+                        <div className="flex border-b border-slate-800 pb-2 mb-2 sticky top-0 bg-slate-900 z-10">
+                            {months.map(m => (<div key={m} className="flex-1 text-center text-xs font-bold text-slate-400 border-r border-slate-800 last:border-0">{m}月</div>))}
+                        </div>
+                        <div className="space-y-3 relative h-[500px] overflow-y-auto">
+                            <div className="absolute inset-0 flex pointer-events-none z-0">{months.map(m => <div key={m} className="flex-1 border-r border-slate-800 last:border-0 h-full"></div>)}</div>
+                            {combinedProjects.length === 0 && <div className="text-center text-slate-600 py-10">尚無專案或課程資料</div>}
+                            {combinedProjects.map(proj => {
+                                if (!proj.start_date || !proj.end_date) return null;
+                                const start = new Date(proj.start_date);
+                                const end = new Date(proj.end_date);
+                                if (start.getFullYear() !== ganttYear && end.getFullYear() !== ganttYear) return null;
+                                const yearStart = new Date(ganttYear, 0, 1).getTime();
+                                const yearEnd = new Date(ganttYear, 11, 31).getTime();
+                                const duration = yearEnd - yearStart;
+                                const cStart = Math.max(start.getTime(), yearStart);
+                                const cEnd = Math.min(end.getTime(), yearEnd);
+                                if (cEnd < cStart) return null;
+                                const left = ((cStart - yearStart) / duration) * 100;
+                                const width = ((cEnd - cStart) / duration) * 100;
+                                return (
+                                    <div key={proj.id} className="relative h-8 z-10 hover:z-20 group">
+                                        <div className={`absolute h-6 rounded-md shadow-sm text-[10px] flex items-center px-2 cursor-pointer transition-all hover:scale-105 ${getProjColor(proj)}`} style={{ left: `${left}%`, width: `${width}%`, minWidth: '40px' }} title={proj.name}>
+                                            <span className="truncate font-bold">
+                                                {proj.isCourse ? '📚 ' : '💼 '} {proj.name}
+                                            </span>
+                                            <div className="hidden group-hover:block absolute bottom-full left-0 mb-1 bg-slate-900 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap z-50 border border-slate-700">
+                                                <div className="font-bold text-sm">{proj.name}</div>
+                                                <div>{proj.isCourse ? '課程' : '專案'}</div>
+                                                <div>日期: {proj.start_date} ~ {proj.end_date}</div>
+                                                <div>{proj.description}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
-            </nav>
+            );
+        };
 
-            <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen bg-slate-950">
-                {currentView === 'dashboard' && (
-                    <div className="space-y-8 fade-in">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <KPICard title="助教總人數" value={stats.total} icon={<Icons.Users />} color="bg-slate-800 text-slate-400" />
-                            <KPICard title="目前已分配" value={stats.allocated} icon={<div className="w-2 h-2 rounded-full bg-emerald-500"></div>} color="bg-emerald-900/50 text-emerald-400" />
-                            <KPICard title="總學生數" value={studentStats.total} icon={<div className="w-2 h-2 rounded-full bg-indigo-500"></div>} color="bg-indigo-900/50 text-indigo-400" />
+        return (
+            <div className="fade-in space-y-6 pb-20">
+                <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-2xl font-black text-slate-100">專案管理</h2>
+                        <div className="flex bg-slate-800 rounded-lg p-1">
+                            <button onClick={() => setViewMode('kanban')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>看板模式</button>
+                            <button onClick={() => setViewMode('gantt')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'gantt' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>甘特圖</button>
                         </div>
-                        <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
-                            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                                <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
-                                <button onClick={() => setShowCourseModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/50"><Icons.Plus /> 新增課程</button>
-                            </div>
-                            <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程，請點擊右上角新增。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} />)}</tbody></table></div>
+                    </div>
+                    {viewMode === 'kanban' && <button onClick={() => setShowAddProjectModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-lg"><Icons.Plus /> 新增專案</button>}
+                </div>
+                
+                {viewMode === 'gantt' ? renderGantt() : (
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                        <div className="lg:col-span-1 space-y-3 overflow-y-auto max-h-[80vh] custom-scrollbar pr-2">
+                            {combinedProjects.map(p => (
+                                <div key={p.id} onClick={() => setSelectedProject(p)} className={`p-4 rounded-xl border cursor-pointer transition-all relative group ${selectedProject?.id === p.id ? 'bg-indigo-900/50 border-indigo-500' : 'bg-slate-900 border-slate-800 hover:border-slate-600'}`}>
+                                    <h3 className="font-bold text-slate-200 flex items-center gap-2">
+                                        <span className="text-base">{p.isCourse ? '📚' : '💼'}</span> {p.name}
+                                    </h3>
+                                    <div className="flex justify-between mt-2">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.isCourse ? 'bg-blue-900 text-blue-400' : (p.status==='active'?'bg-emerald-900 text-emerald-400':'bg-slate-700 text-slate-400')}`}>{p.isCourse ? '課程' : (p.status==='active'?'進行中':'規劃中')}</span>
+                                        <span className="text-xs text-slate-500">{projectTasks.filter(t => t.project_id === p.id).length} 任務</span>
+                                    </div>
+                                    <button onClick={(e) => { e.stopPropagation(); if(p.isCourse) { onDeleteCourse(p.id); if(selectedProject?.id === p.id) setSelectedProject(null); } else { handleDeleteProject(p.id); } }} className="absolute top-2 right-2 text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
+                                </div>
+                            ))}
+                            {combinedProjects.length === 0 && <div className="text-slate-500 text-center text-sm">暫無專案</div>}
                         </div>
-                        <div>
-                            <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {schedule.map((m, idx) => (
-                                    <div key={idx} className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden group hover:shadow-md transition-all">
-                                        <div className="bg-slate-800 p-3 flex justify-between items-center cursor-pointer border-b border-slate-700" onClick={() => setCollapsedMonths(prev => ({...prev, [idx]: !prev[idx]}))}>
-                                            <div className="font-black text-slate-200 text-lg flex items-center gap-2">{m.month}{collapsedMonths[idx] && <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 rounded">已收合</span>}</div>
-                                            <div className="text-slate-500">{collapsedMonths[idx] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
+                        <div className="lg:col-span-3">
+                            {selectedProject ? (
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 h-full flex flex-col">
+                                    <div className="flex justify-between items-start mb-6 border-b border-slate-700 pb-4">
+                                        <div><h2 className="text-xl font-bold text-white flex items-center gap-2"><span className="text-2xl">{selectedProject.isCourse ? '📚' : '💼'}</span> {selectedProject.name}</h2><p className="text-sm text-slate-400 mt-1">{selectedProject.description}</p></div>
+                                        <div className="flex gap-2">
+                                            <input className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 outline-none" placeholder="新任務..." value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
+                                            <select className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-300 outline-none" value={newTask.assignee_id} onChange={e => setNewTask({...newTask, assignee_id: e.target.value})}>
+                                                <option value="">指派人員...</option>
+                                                {allPersonnelList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                            </select>
+                                            <button onClick={handleAddTask} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-700 whitespace-nowrap">新增</button>
                                         </div>
-                                        {!collapsedMonths[idx] && (
-                                            <div className="divide-y divide-slate-800 text-xs">
-                                                {['early', 'mid', 'late'].map(pKey => {
-                                                    const hasCourse = m[pKey].length > 0;
-                                                    return (
-                                                        <div key={pKey} className={`p-3 ${hasCourse ? 'bg-slate-900' : 'bg-slate-800/30'}`}>
-                                                            <div className="font-bold text-slate-500 text-[10px] uppercase mb-2 tracking-wider">{pKey === 'early' ? '上旬 (1-10)' : pKey === 'mid' ? '中旬 (11-20)' : '下旬 (21+)'}</div>
-                                                            <div className="space-y-1.5">
-                                                                {m[pKey].map((p, i) => (
-                                                                    <div key={i} className="flex justify-between items-center bg-indigo-900/30 p-1.5 rounded border border-indigo-900/50">
-                                                                        <span className="font-bold text-slate-300">{p.name} <span className="font-normal text-slate-500 scale-90 inline-block">{p.batch}</span></span>
-                                                                        <span className="font-bold text-indigo-400 bg-slate-800 px-1.5 rounded shadow-sm">{p.students}</span>
-                                                                    </div>
-                                                                ))}
-                                                                {!hasCourse && <div className="text-slate-600 text-[10px] text-center italic">- 空閒 -</div>}
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-4 flex-1">
+                                        {['todo', 'doing', 'done'].map(status => (
+                                            <div key={status} className="bg-slate-950/50 rounded-lg p-3">
+                                                <div className="text-xs font-bold text-slate-400 uppercase mb-3 flex justify-between">
+                                                    <span>{status === 'todo' ? '待辦' : status === 'doing' ? '進行中' : '已完成'}</span>
+                                                    <span className="bg-slate-800 px-1.5 rounded text-slate-500">{activeProjectTasks.filter(t => t.status === status).length}</span>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {activeProjectTasks.filter(t => t.status === status).map(task => (
+                                                        <div key={task.id} className="bg-slate-800 p-3 rounded border border-slate-700 hover:border-slate-600 group">
+                                                            <div className="text-sm text-slate-200 font-medium mb-2">{task.title}</div>
+                                                            <div className="flex justify-between items-center">
+                                                                {task.assignee_id ? <span className="text-[10px] bg-indigo-900 text-indigo-300 px-1.5 py-0.5 rounded">{allPersonnelList.find(p => p.id === task.assignee_id)?.name || '未知'}</span> : <span className="text-[10px] text-slate-600">未指派</span>}
+                                                                <div className="flex gap-2">
+                                                                    <select className="bg-transparent text-[10px] text-slate-500 outline-none cursor-pointer hover:text-slate-300" value={task.status} onChange={(e) => handleTaskStatusChange(task.id, e.target.value)}>
+                                                                        <option value="todo">待辦</option>
+                                                                        <option value="doing">進行</option>
+                                                                        <option value="done">完成</option>
+                                                                    </select>
+                                                                    <button onClick={() => handleDeleteTask(task.id)} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Icons.Trash /></button>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    );
-                                                })}
-                                                <div className="p-3 bg-slate-800 flex justify-between items-center">
-                                                    <span className="font-bold text-slate-400">月月繪</span>
-                                                    <input type="number" value={m.monthly[0].students} onChange={e => handleMonthlyChange(idx, parseInt(e.target.value)||0)} className="w-16 text-center bg-slate-900 border border-slate-700 rounded px-1 py-0.5 outline-none focus:border-indigo-500 font-bold text-indigo-400 text-slate-200" />
+                                                    ))}
                                                 </div>
                                             </div>
-                                        )}
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+                            ) : <div className="h-full flex items-center justify-center text-slate-500 bg-slate-900/50 rounded-xl border border-dashed border-slate-800">請從左側選擇一個專案以查看詳情</div>}
+                        </div>
+                    </div>
+                )}
+                {showAddProjectModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                        <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-800">
+                            <h3 className="text-xl font-bold text-slate-100 mb-4">新增專案</h3>
+                            <div className="space-y-3">
+                                <input className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500" placeholder="專案名稱" value={newProj.name} onChange={e => setNewProj({...newProj, name: e.target.value})} />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs text-slate-400 mb-1">開始日期</label>
+                                        <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none" value={newProj.start_date} onChange={e => setNewProj({...newProj, start_date: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-400 mb-1">結束日期</label>
+                                        <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none" value={newProj.end_date} onChange={e => setNewProj({...newProj, end_date: e.target.value})} />
+                                    </div>
+                                </div>
+                                <textarea className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500 h-24 resize-none" placeholder="描述..." value={newProj.description} onChange={e => setNewProj({...newProj, description: e.target.value})} />
+                                <div className="flex gap-2 justify-end mt-4"><button onClick={() => setShowAddProjectModal(false)} className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-slate-300 transition-colors">取消</button><button onClick={handleCreateProject} className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">建立</button></div>
                             </div>
                         </div>
                     </div>
                 )}
+            </div>
+        );
+    };
 
-                {currentView === 'attendance' && WorkScheduleView}
+    const WorkScheduleView = ({ personnel, categoryGroups, attendanceData, onUpdateAttendance, onBatchUpdate, taskTypes, setShowTaskTypeModal, wsSearchTerm, setWsSearchTerm, dailyStats, wsShowBatchModal, setWsShowBatchModal, wsBatchForm, setWsBatchForm }) => {
+        const [selectedMonth, setSelectedMonth] = useState(new Date());
+        const [viewMode, setViewMode] = useState('week'); 
+        const [expandedGroups, setExpandedGroups] = useState({});
+        const [popover, setPopover] = useState(null);
+        const [popoverContext, setPopoverContext] = useState("");
+        
+        useEffect(() => {
+           if (Object.keys(expandedGroups).length === 0 && categoryGroups.length > 0) {
+               setExpandedGroups(categoryGroups.reduce((acc, g) => ({...acc, [g.name]: true}), {}));
+           }
+        }, [categoryGroups]);
+
+        const daysInMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
+        const days = Array.from({length: daysInMonth}, (_, i) => i + 1);
+
+        const datesToShow = useMemo(() => {
+            if (viewMode === 'month') {
+                const year = selectedMonth.getFullYear();
+                const month = selectedMonth.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                return Array.from({length: daysInMonth}, (_, i) => new Date(year, month, i + 1));
+            } else {
+                const start = new Date(selectedMonth);
+                const day = start.getDay();
+                start.setDate(start.getDate() - day); 
+                return Array.from({length: 7}, (_, i) => {
+                    const d = new Date(start);
+                    d.setDate(start.getDate() + i);
+                    return d;
+                });
+            }
+        }, [viewMode, selectedMonth]);
+
+        const title = viewMode === 'month' 
+           ? `${selectedMonth.getFullYear()}年 ${selectedMonth.getMonth()+1}月`
+           : `${datesToShow[0].getMonth()+1}/${datesToShow[0].getDate()} - ${datesToShow[6].getMonth()+1}/${datesToShow[6].getDate()}`;
+
+        const filteredGroups = categoryGroups.map(g => {
+            const filteredItems = g.items.map(cat => ({
+                ...cat,
+                people: (personnel[cat.id] || []).filter(p => p.name.includes(wsSearchTerm))
+            })).filter(cat => cat.people.length > 0);
+            return { ...g, items: filteredItems };
+        }).filter(g => g.items.length > 0);
+        
+        const handleNavigate = (dir) => {
+           const d = new Date(selectedMonth);
+           if(viewMode === 'month') d.setMonth(d.getMonth() + dir);
+           else d.setDate(d.getDate() + dir * 7);
+           setSelectedMonth(d);
+        };
+
+        const handleCellClick = (e, empId, dateStr, context) => {
+            const rect = e.target.getBoundingClientRect();
+            setPopover({ empId, dateStr, x: rect.left, y: rect.bottom + window.scrollY });
+            setPopoverContext(context || "");
+        };
+
+        const handleSaveCell = (status) => {
+           if (popover) {
+              onUpdateAttendance(popover.empId, popover.dateStr, status, popoverContext);
+              setPopover(null);
+              setPopoverContext("");
+           }
+        };
+        
+        const handleBatchSubmit = () => {
+           if (!wsBatchForm.personId) return;
+           const start = new Date(wsBatchForm.startDate);
+           const end = new Date(wsBatchForm.endDate);
+           const records = [];
+           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                records.push({
+                    employee_id: wsBatchForm.personId,
+                    date: d.toISOString().split('T')[0],
+                    status: wsBatchForm.type,
+                    context: wsBatchForm.context
+                });
+           }
+           onBatchUpdate(records);
+           setWsShowBatchModal(false);
+        };
+
+        return (
+            <div className="fade-in space-y-4 pb-20">
+                <div className="bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => handleNavigate(-1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronLeft /></button>
+                        <div className="text-lg font-bold text-slate-100 min-w-[120px] text-center">{title}</div>
+                        <button onClick={() => handleNavigate(1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-300"><Icons.ChevronRight /></button>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${viewMode === 'week' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>週檢視</button>
+                        <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${viewMode === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>月檢視</button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                         <button onClick={() => setShowTaskTypeModal(true)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-900 px-2 py-1 rounded">⚙️ 設定</button>
+                         <button onClick={() => setWsShowBatchModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md"><Icons.Plus /> 新增紀錄</button>
+                         <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"><Icons.Search /><input className="bg-transparent border-none outline-none text-sm w-32 text-slate-200" placeholder="搜尋姓名..." value={wsSearchTerm} onChange={e => setWsSearchTerm(e.target.value)} /></div>
+                         <div className="flex gap-4 text-xs font-medium text-slate-400">
+                             <span>今日工作: <span className="text-blue-400 font-bold">{dailyStats.workingToday}</span></span>
+                             <span>休假: <span className="text-rose-400 font-bold">{dailyStats.leaveToday}</span></span>
+                         </div>
+                    </div>
+                </div>
+
+                <div className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden relative ${viewMode === 'month' ? 'view-month' : ''}`}>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs border-collapse table-fixed">
+                            <thead>
+                                <tr>
+                                    <th className="sticky left-0 bg-slate-900 z-20 border-b border-r border-slate-800 p-3 w-[150px] text-left font-bold text-slate-300">人員</th>
+                                    {datesToShow.map(d => {
+                                        const dayName = ['日','一','二','三','四','五','六'][d.getDay()];
+                                        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                        return (
+                                            <th key={d.toISOString()} className={`border-b border-r border-slate-800 p-1 text-center font-medium ${isWeekend ? 'bg-slate-800/50 text-rose-300' : 'text-slate-400'}`} style={{width: viewMode==='week' ? '12%' : '36px'}}>
+                                                <div className="text-[10px]">{d.getMonth()+1}/{d.getDate()}</div>
+                                                <div className="text-[9px]">({dayName})</div>
+                                            </th>
+                                        );
+                                    })}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredGroups.map(group => (
+                                    <React.Fragment key={group.name}>
+                                        <tr className="bg-slate-800/50 cursor-pointer hover:bg-slate-800" onClick={() => setExpandedGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
+                                            <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 font-bold text-indigo-400 pl-4 flex items-center gap-2" colSpan={datesToShow.length + 1}>{expandedGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>} {group.name}</td>
+                                        </tr>
+                                        {expandedGroups[group.name] && group.items.map(cat => (
+                                            cat.people.map(p => (
+                                                <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="sticky left-0 bg-slate-900 z-10 border-b border-r border-slate-800 p-2 pl-6 font-medium text-slate-300 shadow-sm"><div className="flex items-center justify-between"><span>{p.name}</span><span className="text-[9px] text-slate-400 bg-slate-800 px-1 rounded border border-slate-700">[{cat.label}]</span></div></td>
+                                                    {datesToShow.map(d => {
+                                                        const dateStr = d.toISOString().split('T')[0];
+                                                        const record = attendanceData[p.id]?.[dateStr];
+                                                        const statusConfig = taskTypes.find(t => t.id === record?.status);
+                                                        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                                                        return (
+                                                            <td key={dateStr} onClick={(e) => handleCellClick(e, p.id, dateStr, record?.context)} className={`border-b border-r border-slate-800 text-center attendance-cell relative ${isWeekend ? 'bg-slate-800/30' : ''}`}>
+                                                                {statusConfig ? (
+                                                                    <div className={`task-block ${statusConfig.color}`} data-tooltip={`${statusConfig.label} ${record.context ? '- '+record.context : ''}`}>
+                                                                        {viewMode === 'week' ? (record.context || statusConfig.label) : (record.context ? record.context.substring(0,2) : statusConfig.label.substring(0,1))}
+                                                                    </div>
+                                                                ) : <div className="w-full h-full opacity-0 hover:opacity-100 text-slate-600 text-[10px] flex items-center justify-center">+</div>}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {/* Popover */}
+                    {popover && (
+                        <div className="fixed z-50 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-3 w-48 animate-in zoom-in-95 duration-100 flex flex-col gap-2" style={{ top: popover.y + 5, left: Math.min(popover.x - 60, window.innerWidth - 200) }}>
+                            <input type="text" placeholder="工作內容..." className="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 mb-1 outline-none focus:border-indigo-500 text-slate-200" autoFocus value={popoverContext} onChange={e => setPopoverContext(e.target.value)} />
+                            <div className="grid grid-cols-2 gap-1.5">{taskTypes.map(type => (<button key={type.id} onClick={() => handleSaveCell(type.id)} className={`text-[10px] px-2 py-1.5 rounded text-center font-bold shadow-sm ${type.color} opacity-90 hover:opacity-100`}>{type.label}</button>))}</div>
+                            <div className="h-px bg-slate-700 my-1"></div>
+                            <button onClick={() => handleSaveCell(null)} className="text-xs px-2 py-1.5 rounded text-center font-medium text-slate-400 hover:bg-slate-700 w-full">清除紀錄</button>
+                            <div className="fixed inset-0 z-[-1]" onClick={() => setPopover(null)}></div>
+                        </div>
+                    )}
+                </div>
                 
-                {currentView === 'personnel' && (
-                    <div className="fade-in max-w-5xl mx-auto">
-                        <div className="flex justify-between items-end mb-6">
-                            <div><h2 className="text-2xl font-black text-slate-100">人員名單管理</h2><p className="text-sm text-slate-500 mt-1">拖曳卡片以調整職位，點擊 + 號新增人員</p></div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowCategoryModal(true)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-900 px-2 py-1 rounded">⚙️ 管理分類</button>
-                                <button onClick={() => setCollapsedPersonnelGroups({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button>
-                                <button onClick={() => {const all={}; categoryGroups.forEach(g=>all[g.name]=true); setCollapsedPersonnelGroups(all);}} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button>
+                {/* Batch Modal */}
+                {wsShowBatchModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-800">
+                            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-100">新增紀錄</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button></div>
+                            <div className="space-y-4">
+                                <div><label className="block text-xs font-bold text-slate-400 mb-1">人員</label><select className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" value={wsBatchForm.personId} onChange={e => setWsBatchForm({...wsBatchForm, personId: e.target.value})}><option value="">請選擇...</option>{categoryGroups.map(g => (<optgroup key={g.name} label={g.name}>{g.items.map(cat => personnel[cat.id]?.map(p => <option key={p.id} value={p.id}>{p.name} ({cat.label})</option>))}</optgroup>))}</select></div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-slate-400 mb-1">開始</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.startDate} onChange={e => setWsBatchForm({...wsBatchForm, startDate: e.target.value})} /></div>
+                                    <div><label className="block text-xs font-bold text-slate-400 mb-1">結束</label><input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200" value={wsBatchForm.endDate} onChange={e => setWsBatchForm({...wsBatchForm, endDate: e.target.value})} /></div>
+                                </div>
+                                <div><label className="block text-xs font-bold text-slate-400 mb-1">類型</label><div className="flex flex-wrap gap-2">{taskTypes.map(t => (<button key={t.id} onClick={() => setWsBatchForm({...wsBatchForm, type: t.id})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors shadow-sm ${wsBatchForm.type === t.id ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-80 border-transparent'} ${t.color}`}>{t.label}</button>))}</div></div>
+                                <div><label className="block text-xs font-bold text-slate-400 mb-1">內容/備註</label><input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-200" placeholder="S1助教、備課..." value={wsBatchForm.context} onChange={e => setWsBatchForm({...wsBatchForm, context: e.target.value})} /></div>
+                                <button onClick={handleBatchSubmit} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg mt-2 transition-colors">確認</button>
                             </div>
                         </div>
-                        <div className="space-y-6">
-                            {categoryGroups.map((group, gIdx) => (
-                                <div key={gIdx} className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
-                                    <div className="p-4 bg-slate-800/80 border-b border-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => setCollapsedPersonnelGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
-                                        <div className="flex items-center gap-3"><div className="w-1 h-6 bg-indigo-500 rounded-full"></div><h3 className="font-bold text-slate-200">{group.name}</h3></div>
-                                        <div className="text-slate-500">{collapsedPersonnelGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const AnalyticsView = ({ personnel, attendanceData, taskTypes, categoryGroups }) => {
+        const [selectedMonth, setSelectedMonth] = useState(() => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        });
+
+        const flatCategories = useMemo(() => categoryGroups.flatMap(g => g.items), [categoryGroups]);
+
+        const allPersonnelList = useMemo(() => {
+            let list = [];
+            Object.entries(personnel).forEach(([catId, arr]) => {
+                arr.forEach(p => {
+                    list.push({ ...p, categoryId: catId });
+                });
+            });
+            return list;
+        }, [personnel]);
+
+        const analytics = useMemo(() => {
+            if (!selectedMonth) return null;
+            const [year, month] = selectedMonth.split('-').map(Number);
+            
+            // 計算本月平日天數 (不含週六日)
+            let weekdays = 0;
+            const daysInMonth = new Date(year, month, 0).getDate();
+            for (let i = 1; i <= daysInMonth; i++) {
+                const day = new Date(year, month - 1, i).getDay();
+                if (day !== 0 && day !== 6) weekdays++;
+            }
+
+            const stats = [];
+            const taskCounts = {};
+            let totalWorkDays = 0;
+            let totalLeaveDays = 0;
+
+            allPersonnelList.forEach(p => {
+                let workDays = 0;
+                let leaveDays = 0;
+
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const record = attendanceData[p.id]?.[dateStr];
+                    
+                    if (record && record.status) {
+                        const isLeave = record.status === 'leave'; // 根據 ID 判斷是否為休假
+                        if (isLeave) {
+                            leaveDays++;
+                            totalLeaveDays++;
+                        } else {
+                            workDays++;
+                            totalWorkDays++;
+                        }
+                        taskCounts[record.status] = (taskCounts[record.status] || 0) + 1;
+                    }
+                }
+
+                stats.push({
+                    ...p,
+                    workDays,
+                    leaveDays,
+                    idleDays: Math.max(0, weekdays - workDays - leaveDays)
+                });
+            });
+
+            const topActive = [...stats].sort((a, b) => b.workDays - a.workDays).slice(0, 5);
+            const topIdle = [...stats].sort((a, b) => b.idleDays - a.idleDays);
+
+            return { weekdays, totalWorkDays, totalLeaveDays, taskCounts, stats, topActive, topIdle };
+        }, [selectedMonth, allPersonnelList, attendanceData]);
+
+        if (!analytics) return null;
+
+        return (
+            <div className="fade-in space-y-6 pb-20 max-w-6xl mx-auto">
+                <div className="flex justify-between items-center mb-6 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg"><Icons.BarChart /></div>
+                        <h2 className="text-xl font-black text-slate-100">數據分析中心</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400">分析月份:</span>
+                        <input 
+                            type="month" 
+                            value={selectedMonth} 
+                            onChange={e => setSelectedMonth(e.target.value)} 
+                            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500 transition-colors"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-sm flex flex-col justify-center items-center hover:border-slate-700 transition-colors">
+                        <span className="text-xs text-slate-400 font-bold mb-1">本月總工作排班</span>
+                        <span className="text-4xl font-black text-blue-400">{analytics.totalWorkDays} <span className="text-sm text-blue-500/50">人次</span></span>
+                    </div>
+                    <div className="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-sm flex flex-col justify-center items-center hover:border-slate-700 transition-colors">
+                        <span className="text-xs text-slate-400 font-bold mb-1">本月總休假</span>
+                        <span className="text-4xl font-black text-rose-400">{analytics.totalLeaveDays} <span className="text-sm text-rose-500/50">人次</span></span>
+                    </div>
+                    <div className="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-sm flex flex-col justify-center items-center hover:border-slate-700 transition-colors">
+                        <span className="text-xs text-slate-400 font-bold mb-1">平均閒置天數 (基準:{analytics.weekdays}天)</span>
+                        <span className="text-4xl font-black text-amber-400">
+                            {analytics.stats.length ? (analytics.stats.reduce((acc, curr) => acc + curr.idleDays, 0) / analytics.stats.length).toFixed(1) : 0} 
+                            <span className="text-sm text-amber-500/50"> 天/人</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 工作總結 */}
+                    <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-sm">
+                        <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2">
+                            <span className="w-1.5 h-5 bg-blue-500 rounded-full"></span>
+                            工作總結 (任務分佈)
+                        </h3>
+                        <div className="space-y-4">
+                            {Object.entries(analytics.taskCounts).sort((a,b)=>b[1]-a[1]).map(([taskId, count]) => {
+                                const task = taskTypes.find(t => t.id === taskId);
+                                const label = task ? task.label : taskId;
+                                const colorClass = task ? task.color.split(' ')[0] : 'bg-slate-600'; 
+                                const total = analytics.totalWorkDays + analytics.totalLeaveDays;
+                                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                                
+                                return (
+                                    <div key={taskId} className="group">
+                                        <div className="flex justify-between text-xs mb-1.5">
+                                            <span className="text-slate-300 font-bold">{label}</span>
+                                            <span className="text-slate-400 font-mono">{count} 次 <span className="text-slate-500">({percentage}%)</span></span>
+                                        </div>
+                                        <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden flex">
+                                            <div className={`h-full rounded-full transition-all duration-500 ease-out group-hover:brightness-110 ${colorClass}`} style={{ width: `${percentage}%` }}></div>
+                                        </div>
                                     </div>
-                                    {!collapsedPersonnelGroups[group.name] && (
-                                        <div className="p-6 bg-slate-900/30 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                            {group.items.map(cat => (
-                                                <div key={cat.id} onDragOver={e => onDragOver(e, cat.id)} onDrop={e => onDrop(e, cat.id)} className={`bg-slate-900 rounded-xl border-2 border-dashed border-slate-800 p-3 flex flex-col h-[180px] transition-all duration-200 ${dragOverContainer === cat.id ? 'drag-over scale-[1.02]' : 'hover:border-slate-700'}`}>
-                                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
-                                                        <span className="font-bold text-xs text-slate-400 flex items-center gap-1">{cat.label} <span className="bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md text-[10px]">{personnel[cat.id]?.length || 0}</span></span>
-                                                        <button onClick={(e) => { e.stopPropagation(); setAddingToCategory(cat.id); setTempName(''); }} className="text-slate-600 hover:text-indigo-400 transition-colors"><Icons.Plus /></button>
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                                                        {personnel[cat.id]?.map(p => (
-                                                            <div key={p.id} draggable onDragStart={e => onDragStart(e, p, cat.id)} className="group bg-slate-800 border border-slate-700 p-2 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-900 hover:shadow-md transition-all flex justify-between items-center">
-                                                                <span className="text-xs font-medium text-slate-300">{p.name}</span>
-                                                                <button onClick={() => {setDeleteTarget({categoryId:cat.id, personId:p.id}); setShowDeleteModal(true);}} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
-                                                            </div>
-                                                        ))}
-                                                        {addingToCategory === cat.id && (<div className="animate-in fade-in"><input autoFocus value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleConfirmAddPerson()} onBlur={() => tempName.trim() ? handleConfirmAddPerson() : setAddingToCategory(null)} placeholder="輸入姓名..." className="w-full text-xs p-2 border-2 border-indigo-500 bg-slate-800 text-slate-200 rounded-lg outline-none shadow-sm" /></div>)}
-                                                        {(!personnel[cat.id]?.length && addingToCategory !== cat.id) && (<div className="h-full flex items-center justify-center text-[10px] text-slate-600 italic">拖曳至此</div>)}
+                                );
+                            })}
+                            {Object.keys(analytics.taskCounts).length === 0 && <div className="text-slate-500 text-sm text-center py-8 border border-dashed border-slate-700 rounded-lg">本月尚無任務紀錄</div>}
+                        </div>
+                    </div>
+
+                    {/* 人員效率 */}
+                    <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-sm">
+                        <h3 className="font-bold text-slate-200 mb-6 flex items-center gap-2">
+                            <span className="w-1.5 h-5 bg-emerald-500 rounded-full"></span>
+                            人員效率 (最高排班 Top 5)
+                        </h3>
+                        <div className="space-y-3">
+                            {analytics.topActive.filter(p => p.workDays > 0).map((p, idx) => (
+                                <div key={p.id} className="flex items-center justify-between bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/50 hover:bg-slate-800 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shadow-inner ${idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : idx === 1 ? 'bg-slate-300/20 text-slate-300 border border-slate-300/30' : idx === 2 ? 'bg-orange-700/20 text-orange-400 border border-orange-700/30' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                                            {idx + 1}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-200">{p.name}</span>
+                                            <span className="text-[10px] text-slate-500">{flatCategories.find(c => c.id === p.categoryId)?.label || '未知職位'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-blue-400 font-black text-lg leading-none">{p.workDays} <span className="text-[10px] text-slate-500 font-normal">天</span></span>
+                                    </div>
+                                </div>
+                            ))}
+                            {analytics.topActive.filter(p => p.workDays > 0).length === 0 && <div className="text-slate-500 text-sm text-center py-8 border border-dashed border-slate-700 rounded-lg">無排班資料</div>}
+                        </div>
+                    </div>
+                </div>
+
+                {/* 空窗期名單 */}
+                <div className="bg-slate-900 rounded-xl border border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-800">
+                        <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
+                            <span className="w-1.5 h-5 bg-amber-500 rounded-full"></span>
+                            安排空窗期 (本月閒置人員名單)
+                        </h3>
+                        <p className="text-xs text-slate-400">根據本月平日基準 ({analytics.weekdays}天) 計算。優先顯示空窗天數最多的人員，方便您快速安排下一個專案任務。</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-800/80 text-slate-400 text-xs uppercase tracking-wider">
+                                <tr>
+                                    <th className="px-6 py-3 font-medium">人員姓名</th>
+                                    <th className="px-6 py-3 font-medium">所屬職位</th>
+                                    <th className="px-6 py-3 font-medium text-center">排班天數</th>
+                                    <th className="px-6 py-3 font-medium text-center">休假天數</th>
+                                    <th className="px-6 py-3 font-medium text-right text-amber-400">空窗天數 (可排班)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/50">
+                                {analytics.topIdle.filter(p => p.idleDays > 0).map(p => {
+                                    const cat = flatCategories.find(c => c.id === p.categoryId);
+                                    const idleRatio = p.idleDays / analytics.weekdays;
+                                    return (
+                                        <tr key={p.id} className="hover:bg-slate-800/40 transition-colors group">
+                                            <td className="px-6 py-4 font-bold text-slate-300 flex items-center gap-2">
+                                                {idleRatio > 0.8 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="極度閒置"></span>}
+                                                {p.name}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500 text-xs border-l border-slate-800/30">
+                                                <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">{cat ? cat.label : '未知'}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center border-l border-slate-800/30"><span className="text-blue-400 font-bold bg-blue-900/10 px-2 py-0.5 rounded">{p.workDays}</span></td>
+                                            <td className="px-6 py-4 text-center text-slate-500 border-l border-slate-800/30">{p.leaveDays > 0 ? <span className="text-rose-400 bg-rose-900/10 px-2 py-0.5 rounded">{p.leaveDays}</span> : '-'}</td>
+                                            <td className="px-6 py-4 text-right border-l border-slate-800/30">
+                                                <span className={`font-black text-lg ${idleRatio > 0.5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                    {p.idleDays} <span className="text-xs font-normal text-slate-500">天</span>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {analytics.topIdle.filter(p => p.idleDays > 0).length === 0 && (
+                                    <tr><td colSpan="5" className="text-center py-8 text-slate-500 italic">本月人員皆已滿排，無空窗期</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const PersonnelView = ({ personnel, categoryGroups, setAddingToCategory, setTempName, addingToCategory, tempName, handleConfirmAddPerson, setDeleteTarget, setShowDeleteModal, onDragStart, onDragOver, onDrop, dragOverContainer, setShowCategoryModal, setCollapsedPersonnelGroups, collapsedPersonnelGroups, handleRemovePerson, projects, projectTasks, attendanceData, masterCourses, taskTypes }) => {
+        const [selectedPersonTasks, setSelectedPersonTasks] = useState(null);
+
+        return (
+            <div className="fade-in max-w-5xl mx-auto space-y-6 pb-20">
+                <div className="flex justify-between items-end mb-6">
+                    <div><h2 className="text-2xl font-black text-slate-100">人員名單管理</h2><p className="text-sm text-slate-500 mt-1">拖曳卡片以調整職位，點擊 + 號新增人員。點擊 📄 查看個人任務。</p></div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setShowCategoryModal(true)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-900 px-2 py-1 rounded">⚙️ 管理分類</button>
+                        <button onClick={() => setCollapsedPersonnelGroups({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button>
+                        <button onClick={() => {const all={}; categoryGroups.forEach(g=>all[g.name]=true); setCollapsedPersonnelGroups(all);}} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button>
+                    </div>
+                </div>
+                {categoryGroups.map((group, idx) => (
+                    <div key={idx} className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
+                        <div className="p-4 bg-slate-800/80 border-b border-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => setCollapsedPersonnelGroups(prev => ({...prev, [group.name]: !prev[group.name]}))}>
+                            <div className="flex items-center gap-3"><div className="w-1 h-6 bg-indigo-500 rounded-full"></div><h3 className="font-bold text-slate-200">{group.name}</h3></div>
+                            <div className="text-slate-500">{collapsedPersonnelGroups[group.name] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
+                        </div>
+                        {!collapsedPersonnelGroups[group.name] && (
+                            <div className="p-6 bg-slate-900/30 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {group.items.map(cat => (
+                                    <div key={cat.id} onDragOver={e => onDragOver(e, cat.id)} onDrop={e => onDrop(e, cat.id)} className={`bg-slate-900 rounded-xl border-2 border-dashed border-slate-800 p-3 flex flex-col h-[180px] transition-all duration-200 ${dragOverContainer === cat.id ? 'drag-over scale-[1.02]' : 'hover:border-slate-700'}`}>
+                                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+                                            <span className="font-bold text-xs text-slate-400 flex items-center gap-1">{cat.label} <span className="bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md text-[10px]">{personnel[cat.id]?.length || 0}</span></span>
+                                            <button onClick={(e) => { e.stopPropagation(); setAddingToCategory(cat.id); setTempName(''); }} className="text-slate-600 hover:text-indigo-400 transition-colors"><Icons.Plus /></button>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                                            {personnel[cat.id]?.map(p => (
+                                                <div key={p.id} draggable onDragStart={e => onDragStart(e, p, cat.id)} className="group bg-slate-800 border border-slate-700 p-2 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-900 hover:shadow-md transition-all flex justify-between items-center">
+                                                    <span className="text-xs font-medium text-slate-300">{p.name}</span>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => setSelectedPersonTasks(p)} className="text-slate-500 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" title="查看個人任務"><Icons.List /></button>
+                                                        <button onClick={() => {setDeleteTarget({categoryId:cat.id, personId:p.id}); setShowDeleteModal(true);}} className="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash /></button>
                                                     </div>
                                                 </div>
                                             ))}
+                                            {addingToCategory === cat.id && (<div className="animate-in fade-in"><input autoFocus value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleConfirmAddPerson()} onBlur={() => tempName.trim() ? handleConfirmAddPerson() : setAddingToCategory(null)} placeholder="輸入姓名..." className="w-full text-xs p-2 border-2 border-indigo-500 bg-slate-800 text-slate-200 rounded-lg outline-none shadow-sm" /></div>)}
+                                            {(!personnel[cat.id]?.length && addingToCategory !== cat.id) && (<div className="h-full flex items-center justify-center text-[10px] text-slate-600 italic">拖曳至此</div>)}
                                         </div>
-                                    )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+
+                {/* 個人任務 Modal */}
+                {selectedPersonTasks && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                        <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-800 max-h-[85vh] flex flex-col animate-in zoom-in-95">
+                            <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                                <h3 className="text-xl font-bold text-slate-100 flex items-center gap-3">
+                                    <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-sm">{selectedPersonTasks.name}</span> 的任務清單
+                                </h3>
+                                <button onClick={() => setSelectedPersonTasks(null)} className="text-slate-400 hover:text-slate-200"><Icons.X /></button>
+                            </div>
+                            
+                            <div className="overflow-y-auto custom-scrollbar pr-2 space-y-6 flex-1">
+                                {/* 區塊 1：專案/課程任務 */}
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">💼 進行中專案任務</h4>
+                                    <div className="space-y-2">
+                                        {projectTasks.filter(t => t.assignee_id === selectedPersonTasks.id).length > 0 ? (
+                                            projectTasks.filter(t => t.assignee_id === selectedPersonTasks.id).map(task => {
+                                                // 尋找對應的專案或課程名稱
+                                                let projName = '未知專案/課程';
+                                                const customProj = projects.find(p => p.id === task.project_id);
+                                                if (customProj) {
+                                                    projName = '💼 ' + customProj.name;
+                                                } else {
+                                                    const courseProj = masterCourses.find(c => c.id === task.project_id);
+                                                    if (courseProj) projName = '📚 ' + courseProj.name + (courseProj.batch ? ` (${courseProj.batch})` : '');
+                                                }
+
+                                                return (
+                                                    <div key={task.id} className="bg-slate-800 p-3 rounded-lg border border-slate-700 flex justify-between items-center hover:bg-slate-700/50 transition-colors">
+                                                        <div>
+                                                            <div className="text-[10px] text-slate-400 mb-1">{projName}</div>
+                                                            <div className="text-sm font-bold text-slate-200">{task.title}</div>
+                                                        </div>
+                                                        <span className={`text-[10px] px-2 py-1 rounded font-bold ${task.status === 'todo' ? 'bg-slate-700 text-slate-300' : task.status === 'doing' ? 'bg-indigo-900 text-indigo-300' : 'bg-emerald-900 text-emerald-400'}`}>
+                                                            {task.status === 'todo' ? '待辦' : task.status === 'doing' ? '進行中' : '已完成'}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            })
+                                        ) : (
+                                            <div className="text-xs text-slate-500 italic py-4 text-center border border-dashed border-slate-700 rounded-lg">目前沒有分配專屬任務</div>
+                                        )}
+                                    </div>
                                 </div>
-                            ))}
+
+                                {/* 區塊 2：近期班表紀錄 */}
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">📅 近期工作排班 (最新 10 筆)</h4>
+                                    <div className="space-y-2">
+                                        {Object.entries(attendanceData[selectedPersonTasks.id] || {})
+                                            .sort((a,b) => new Date(b[0]) - new Date(a[0])) // 日期降序
+                                            .slice(0, 10) 
+                                            .map(([date, record]) => {
+                                                const tConfig = taskTypes.find(t => t.id === record.status);
+                                                return (
+                                                    <div key={date} className="bg-slate-800 p-2.5 rounded-lg border border-slate-700 flex justify-between items-center hover:bg-slate-700/50 transition-colors">
+                                                        <span className="text-xs font-mono font-bold text-slate-400">{date}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-bold text-slate-200">{record.context || '-'}</span>
+                                                            {tConfig && <span className={`text-[10px] px-2 py-0.5 rounded shadow-sm ${tConfig.color}`}>{tConfig.label}</span>}
+                                                        </div>
+                                                    </div>
+                                                );
+                                        })}
+                                        {Object.keys(attendanceData[selectedPersonTasks.id] || {}).length === 0 && (
+                                            <div className="text-xs text-slate-500 italic py-4 text-center border border-dashed border-slate-700 rounded-lg">目前沒有班表紀錄</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
-                {currentView === 'timeline' && TimelineView}
+            </div>
+        );
+    };
+
+    const App = () => {
+          const [currentView, setCurrentView] = useState('dashboard');
+          const [loading, setLoading] = useState(true);
+          const [syncStatus, setSyncStatus] = useState('連線中...');
+          const [forceRefresh, setForceRefresh] = useState(0); 
+
+          const [personnel, setPersonnel] = useState({});
+          const [categoryGroups, setCategoryGroups] = useState(DEFAULT_CATEGORY_GROUPS);
+          const [taskTypes, setTaskTypes] = useState(DEFAULT_TASK_TYPES);
+          const [attendanceData, setAttendanceData] = useState({});
+          const [masterCourses, setMasterCourses] = useState([]);
+          const [schedule, setSchedule] = useState([]);
+          
+          const [projects, setProjects] = useState([]);
+          const [projectTasks, setProjectTasks] = useState([]);
+          
+          const [draggedItem, setDraggedItem] = useState(null);
+          const [dragOverContainer, setDragOverContainer] = useState(null);
+          const [addingToCategory, setAddingToCategory] = useState(null);
+          const [tempName, setTempName] = useState('');
+          
+          const [showCourseModal, setShowCourseModal] = useState(false);
+          const [showDeleteModal, setShowDeleteModal] = useState(false);
+          const [deleteTarget, setDeleteTarget] = useState(null);
+          
+          const [showCategoryModal, setShowCategoryModal] = useState(false);
+          const [showTaskTypeModal, setShowTaskTypeModal] = useState(false);
+          const [newGroupForm, setNewGroupForm] = useState('');
+          const [newCatForm, setNewCatForm] = useState({ groupIdx: 0, label: '', id: '' });
+          const [newTaskForm, setNewTaskForm] = useState({ id: '', label: '', color: 'bg-indigo-600 text-indigo-50 shadow-sm', targetCategory: '' });
+          
+          const [wsSearchTerm, setWsSearchTerm] = useState("");
+          const [wsShowBatchModal, setWsShowBatchModal] = useState(false);
+          const [wsBatchForm, setWsBatchForm] = useState({ personId: '', startDate: '', endDate: '', type: 'persp_group', context: '' });
+
+          const [collapsedMonths, setCollapsedMonths] = useState({});
+          const [collapsedPersonnelGroups, setCollapsedPersonnelGroups] = useState({});
+          const [isMasterCollapsed, setIsMasterCollapsed] = useState(false);
+          const [isScrolled, setIsScrolled] = useState(false);
+          const [errorMsg, setErrorMsg] = useState('');
+
+          const [newCourse, setNewCourse] = useState({
+              name: '透視', type: 'regular', batch: '', students: 0, startDate: '', duration: 70, endDate: ''
+          });
+
+          const fileInputRef = useRef(null);
+          const categories = useMemo(() => categoryGroups.flatMap(g => g.items), [categoryGroups]);
+          const allPersonnelList = useMemo(() => {
+              let list = [];
+              Object.values(personnel).forEach(arr => list = [...list, ...arr]);
+              return list;
+          }, [personnel]);
+
+          const movePersonToCategory = (empId, targetCatId) => {
+              if (!targetCatId) return;
+              setPersonnel(prevPersonnel => {
+                  let currentCatId = null;
+                  let personObj = null;
+                  for (const [catId, list] of Object.entries(prevPersonnel)) {
+                      const found = list.find(p => p.id === empId);
+                      if (found) { currentCatId = catId; personObj = found; break; }
+                  }
+                  if (personObj && currentCatId && currentCatId !== targetCatId) {
+                      const newPersonnel = { ...prevPersonnel };
+                      newPersonnel[currentCatId] = newPersonnel[currentCatId].filter(p => p.id !== empId);
+                      if (!newPersonnel[targetCatId]) newPersonnel[targetCatId] = [];
+                      newPersonnel[targetCatId] = [...newPersonnel[targetCatId], personObj];
+                      syncDB('personnel', newPersonnel); 
+                      return newPersonnel;
+                  }
+                  return prevPersonnel;
+              });
+          };
+
+          useEffect(() => {
+            const handleScroll = () => setIsScrolled(window.scrollY > 10);
+            window.addEventListener('scroll', handleScroll, { passive: true });
+            return () => window.removeEventListener('scroll', handleScroll);
+          }, []);
+
+          useEffect(() => {
+            const initializeData = async () => {
+              setLoading(true); setSyncStatus('同步中...');
+              const safeFetch = async (table, options = {}) => {
+                  try {
+                    const query = supabase.from(table).select('*');
+                    if (options.order) query.order(options.order, { ascending: true });
+                    const { data, error } = await query;
+                    if (error) return []; 
+                    return data || [];
+                  } catch (e) { return []; }
+              };
+              try {
+                const [pData, cData, mData, attData, settingsData, projData, taskData] = await Promise.all([
+                    safeFetch('personnel'), safeFetch('courses'), safeFetch('monthly_data', { order: 'month_index' }), safeFetch('attendance'), safeFetch('app_settings'), safeFetch('projects'), safeFetch('project_tasks')
+                ]);
+                if (settingsData) {
+                    const cats = settingsData.find(s => s.key === 'categories');
+                    const tasks = settingsData.find(s => s.key === 'task_types');
+                    if (cats && cats.value) setCategoryGroups(cats.value);
+                    if (tasks && tasks.value) setTaskTypes(tasks.value);
+                }
+                const currentCats = (settingsData?.find(s => s.key === 'categories')?.value || DEFAULT_CATEGORY_GROUPS).flatMap(g => g.items);
+                if (pData.length > 0) {
+                    const grouped = {}; currentCats.forEach(c => grouped[c.id] = []);
+                    pData.forEach(p => { if (grouped[p.category_id]) grouped[p.category_id].push({ id: p.id, name: p.name }); });
+                    setPersonnel(grouped);
+                } else { const grouped = {}; currentCats.forEach(c => grouped[c.id] = []); setPersonnel(grouped); }
+                
+                if (cData.length > 0) {
+                    setMasterCourses(cData.map(c => ({ id: c.id, name: c.name, type: c.type, batch: c.batch, students: c.students, startDate: c.start_date, endDate: c.end_date, duration: c.duration })));
+                }
+                const initSchedule = Array.from({ length: 12 }, (_, i) => ({ month: `${i + 1}月`, monthly: [{ name: '月月繪', type: 'monthlyActivity', students: mData?.find(m => m.month_index === i)?.students || 0, batch: '常駐' }], early: [], mid: [], late: [] }));
+                setSchedule(initSchedule);
+                if (attData.length > 0) {
+                    const attMap = {}; attData.forEach(record => { if (!attMap[record.employee_id]) attMap[record.employee_id] = {}; attMap[record.employee_id][record.date] = { status: record.status, context: record.context || '' }; });
+                    setAttendanceData(attMap);
+                }
+                if (projData) setProjects(projData);
+                if (taskData) setProjectTasks(taskData);
+                setSyncStatus('✅ 已同步');
+              } catch (err) { setSyncStatus('⚠️ 部分功能受限'); } finally { setLoading(false); }
+            };
+            initializeData();
+          }, [forceRefresh]);
+
+          // --- Logic Hooks ---
+          useEffect(() => {
+              setSchedule(prev => {
+                  const newSchedule = prev.length > 0 ? JSON.parse(JSON.stringify(prev)) : [];
+                  if(newSchedule.length===0) return [];
+                  newSchedule.forEach(m => { m.early = []; m.mid = []; m.late = []; });
+                  masterCourses.forEach(course => {
+                      if (!course.startDate || !course.endDate) return;
+                      const start = new Date(course.startDate);
+                      const end = new Date(course.endDate);
+                      for (let m = 0; m < 12; m++) {
+                          const periods = [{ key: 'early', s: 1, e: 10 }, { key: 'mid', s: 11, e: 20 }, { key: 'late', s: 21, e: 31 }];
+                          periods.forEach(p => {
+                              const testStart = new Date(start.getFullYear(), m, p.s);
+                              const testEnd = new Date(start.getFullYear(), m, p.e);
+                              if (start <= testEnd && end >= testStart) {
+                                  newSchedule[m][p.key].push({ name: course.name, type: course.type, students: course.students, batch: course.batch });
+                              }
+                          });
+                      }
+                  });
+                  return newSchedule;
+              });
+          }, [masterCourses]);
+
+          const calculateEndDate = (startStr, days) => { if (!startStr || !days) return ''; const d = new Date(startStr); d.setDate(d.getDate() + parseInt(days) - 1); return d.toISOString().split('T')[0]; };
+          const calculateDuration = (startStr, endStr) => { if (!startStr || !endStr) return 0; const s = new Date(startStr), e = new Date(endStr); if (e < s) return 0; return Math.ceil(Math.abs(e - s) / (86400000)) + 1; };
+          const syncDB = async (table, data) => { setSyncStatus('同步中...'); try { if (table === 'app_settings') { await supabase.from('app_settings').upsert(data); } else { await supabase.from(table).delete().neq('id', '0'); let records = []; if (table === 'personnel') { Object.entries(data).forEach(([catId, list]) => list.forEach(p => records.push({ id: p.id, category_id: catId, name: p.name }))); } else if (table === 'courses') { records = data.map(c => ({ id: c.id, name: c.name, type: c.type, batch: c.batch, students: c.students, start_date: c.startDate, end_date: c.endDate, duration: c.duration })); } else if (table === 'monthly_data') { records = data.map((m, i) => ({ month_index: i, students: m[0]?.students || 0 })); } if (records.length) await supabase.from(table).insert(records); } setSyncStatus('✅ 已同步'); } catch(e) { setSyncStatus('❌ 失敗'); } };
+
+          const handleAddCourse = () => { if (!newCourse.name || !newCourse.startDate) { setErrorMsg("請填寫必要資訊"); return; } const updated = [...masterCourses, { ...newCourse, id: generateId() }]; setMasterCourses(updated); syncDB('courses', updated); setNewCourse({ ...newCourse, batch: '', students: 0, startDate: '', endDate: '' }); setShowCourseModal(false); setErrorMsg(''); };
+          const handleUpdateCourse = (id, field, val) => { const updated = masterCourses.map(c => { if (c.id !== id) return c; const nc = { ...c, [field]: val }; if (field === 'startDate') nc.endDate = calculateEndDate(val, nc.duration); if (field === 'duration') nc.endDate = calculateEndDate(nc.startDate, val); if (field === 'endDate') nc.duration = calculateDuration(nc.startDate, val); return nc; }); setMasterCourses(updated); syncDB('courses', updated); };
+          const handleDeleteCourse = (id) => { if (!confirm("確定刪除？")) return; const updated = masterCourses.filter(c => c.id !== id); setMasterCourses(updated); syncDB('courses', updated); supabase.from('project_tasks').delete().eq('project_id', id).then(); };
+          const handleMonthlyChange = (mIdx, val) => { const newSched = [...schedule]; newSched[mIdx].monthly[0].students = val; setSchedule(newSched); syncDB('monthly_data', newSchedule.map(m => m.monthly)); };
+          const handleConfirmAddPerson = () => { if (!tempName.trim() || !addingToCategory) return; const newP = { id: generateId(), name: tempName.trim() }; const newPersonnel = { ...personnel, [addingToCategory]: [...(personnel[addingToCategory] || []), newP] }; setPersonnel(newPersonnel); syncDB('personnel', newPersonnel); setTempName(''); setAddingToCategory(null); };
+          const handleRemovePerson = () => { if (!deleteTarget) return; const newPersonnel = { ...personnel }; newPersonnel[deleteTarget.categoryId] = newPersonnel[deleteTarget.categoryId].filter(p => p.id !== deleteTarget.personId); setPersonnel(newPersonnel); syncDB('personnel', newPersonnel); setShowDeleteModal(false); };
+          const onDragStart = (e, person, fromCategory) => { setDraggedItem({ person, fromCategory }); e.dataTransfer.effectAllowed = 'move'; };
+          const onDragOver = (e, catId) => { e.preventDefault(); if (dragOverContainer !== catId) setDragOverContainer(catId); };
+          const onDrop = (e, toCategory) => { e.preventDefault(); setDragOverContainer(null); if (!draggedItem || draggedItem.fromCategory === toCategory) return; const newPersonnel = { ...personnel }; newPersonnel[draggedItem.fromCategory] = newPersonnel[draggedItem.fromCategory].filter(p => p.id !== draggedItem.person.id); newPersonnel[toCategory] = [...(newPersonnel[toCategory] || []), draggedItem.person]; setPersonnel(newPersonnel); syncDB('personnel', newPersonnel); setDraggedItem(null); };
+          const updateAttendance = async (empId, date, status, context) => { const newData = { ...attendanceData }; if (!newData[empId]) newData[empId] = {}; if (!status) delete newData[empId][date]; else newData[empId][date] = { status, context }; setAttendanceData(newData); try { if (!status) await supabase.from('attendance').delete().match({ employee_id: empId, date: date }); else await supabase.from('attendance').upsert({ employee_id: empId, date: date, status: status, context: context }, { onConflict: 'employee_id, date' }); } catch(e) {} };
+          const batchUpdateAttendance = async (records) => { const newData = { ...attendanceData }; records.forEach(r => { if (!newData[r.employee_id]) newData[r.employee_id] = {}; newData[r.employee_id][r.date] = { status: r.status, context: r.context }; }); setAttendanceData(newData); try { await supabase.from('attendance').upsert(records, { onConflict: 'employee_id, date' }); } catch(e) {} };
+          const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes }, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
+          const handleImportClick = () => fileInputRef.current.click();
+          const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (event) => { try { const imported = JSON.parse(event.target.result); if (confirm("匯入?")) { if (imported.settings) { if (imported.settings.categoryGroups) { setCategoryGroups(imported.settings.categoryGroups); await syncDB('app_settings', { key: 'categories', value: imported.settings.categoryGroups }); } if (imported.settings.taskTypes) { setTaskTypes(imported.settings.taskTypes); await syncDB('app_settings', { key: 'task_types', value: imported.settings.taskTypes }); } } if (imported.personnel) { setPersonnel(imported.personnel); await syncDB('personnel', imported.personnel); } if (imported.masterCourses) { setMasterCourses(imported.masterCourses); await syncDB('courses', imported.masterCourses); } if (imported.attendanceData) { setAttendanceData(imported.attendanceData); } if (imported.monthlyData) { await syncDB('monthly_data', imported.monthlyData); } alert("Done"); setForceRefresh(p=>p+1); } } catch(e){} }; reader.readAsText(file); e.target.value=''; };
+          const handleSaveCategories = (newGroups) => { setCategoryGroups(newGroups); syncDB('app_settings', { key: 'categories', value: newGroups }); setShowCategoryModal(false); };
+          const handleSaveTaskTypes = (newTypes) => { setTaskTypes(newTypes); syncDB('app_settings', { key: 'task_types', value: newTypes }); setShowTaskTypeModal(false); };
+
+          const stats = useMemo(() => {
+              let allocated = 0; let frontline = 0;
+              categories.forEach(c => { const count = personnel[c.id]?.length || 0; if (c.id !== 'pool') allocated += count; if (c.type === 'frontline') frontline += count; });
+              const total = allocated + (personnel['pool']?.length || 0);
+              return { total, allocated, unallocated: personnel['pool']?.length || 0, frontline };
+          }, [personnel, categories]);
+          const studentStats = useMemo(() => { let total = 0; masterCourses.forEach(c => total += (parseInt(c.students) || 0)); return { total }; }, [masterCourses]);
+          const dailyStats = useMemo(() => {
+              const todayStr = new Date().toISOString().split('T')[0];
+              let workingToday = 0;
+              let leaveToday = 0;
+              Object.values(attendanceData).forEach(records => {
+                  const todayRecord = records[todayStr];
+                  if (todayRecord) {
+                      if (todayRecord.status === 'leave' || todayRecord.status === 'sick') leaveToday++;
+                      else workingToday++;
+                  }
+              });
+              return { workingToday, leaveToday };
+          }, [attendanceData]);
+
+          if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-400 font-medium">載入中...</div>;
+
+          return (
+             <div className="flex min-h-screen">
+                <nav className="fixed md:relative bottom-0 w-full md:w-64 bg-slate-900 border-t md:border-r border-slate-800 z-50 flex md:flex-col justify-around md:justify-start p-2 md:p-6 md:space-y-6 shadow-lg md:shadow-none">
+                    <div className="hidden md:flex items-center gap-3 px-2 mb-4"><div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div><span className="font-black text-xl text-slate-100 tracking-tight">人力儀表板</span></div>
+                    <button onClick={() => setCurrentView('dashboard')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'dashboard' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Dashboard /> <span className="hidden md:inline">儀表板</span></button>
+                    <button onClick={() => setCurrentView('project')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'project' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Briefcase /> <span className="hidden md:inline">專案管理</span></button>
+                    <button onClick={() => setCurrentView('attendance')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'attendance' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.ClipboardCheck /> <span className="hidden md:inline">工作班表</span></button>
+                    <button onClick={() => setCurrentView('timeline')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'timeline' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Calendar /> <span className="hidden md:inline">課程時間軸</span></button>
+                    <button onClick={() => setCurrentView('personnel')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'personnel' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.Users /> <span className="hidden md:inline">人員名單</span></button>
+                    <button onClick={() => setCurrentView('analytics')} className={`nav-item flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === 'analytics' ? 'bg-indigo-900 text-indigo-100 border-l-4 border-indigo-500' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}><Icons.BarChart /> <span className="hidden md:inline">數據分析</span></button>
+                    <div className="hidden md:block mt-auto pt-6 border-t border-slate-800">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 px-4 mb-2"><Icons.Cloud /> <span>{syncStatus}</span></div>
+                        <button onClick={() => setForceRefresh(p=>p+1)} className="w-full text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 py-2 rounded text-center">重新整理</button>
+                        <div className="grid grid-cols-2 gap-2 px-1 mt-2">
+                            <button onClick={handleExport} className="flex items-center justify-center gap-1 text-xs bg-slate-800 hover:bg-indigo-900 text-slate-300 py-2 rounded transition-colors" title="匯出備份"><Icons.Download /> 匯出</button>
+                            <button onClick={handleImportClick} className="flex items-center justify-center gap-1 text-xs bg-slate-800 hover:bg-emerald-900 text-slate-300 py-2 rounded transition-colors" title="匯入還原"><Icons.Upload /> 匯入</button>
+                            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+                        </div>
+                    </div>
+                </nav>
+
+                <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen bg-slate-950">
+                    {currentView === 'dashboard' && (
+                        <div className="space-y-8 fade-in">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <KPICard title="助教總人數" value={stats.total} icon={<Icons.Users />} color="bg-slate-800 text-slate-400" />
+                                <KPICard title="目前已分配" value={stats.allocated} icon={<div className="w-2 h-2 rounded-full bg-emerald-500"></div>} color="bg-emerald-900/50 text-emerald-400" />
+                                <KPICard title="總學生數" value={studentStats.total} icon={<div className="w-2 h-2 rounded-full bg-indigo-500"></div>} color="bg-indigo-900/50 text-indigo-400" />
+                            </div>
+                            <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
+                                <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                                    <div><h2 className="text-lg font-bold text-slate-100">年度課程總表</h2><p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p></div>
+                                    <button onClick={() => setShowCourseModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/50"><Icons.Plus /> 新增課程</button>
+                                </div>
+                                <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程，請點擊右上角新增。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} />)}</tbody></table></div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between items-end mb-4 px-1"><h2 className="text-lg font-bold text-slate-100">每月排程預覽</h2><div className="flex gap-2"><button onClick={() => setCollapsedMonths({})} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部展開</button><button onClick={() => { const all={}; schedule.forEach((_,i)=>all[i]=true); setCollapsedMonths(all); }} className="text-xs bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-800 font-bold text-slate-300">全部收合</button></div></div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {schedule.map((m, idx) => (
+                                        <div key={idx} className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden group hover:shadow-md transition-all">
+                                            <div className="bg-slate-800 p-3 flex justify-between items-center cursor-pointer border-b border-slate-700" onClick={() => setCollapsedMonths(prev => ({...prev, [idx]: !prev[idx]}))}>
+                                                <div className="font-black text-slate-200 text-lg flex items-center gap-2">{m.month}{collapsedMonths[idx] && <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 rounded">已收合</span>}</div>
+                                                <div className="text-slate-500">{collapsedMonths[idx] ? <Icons.ChevronDown/> : <Icons.ChevronUp/>}</div>
+                                            </div>
+                                            {!collapsedMonths[idx] && (
+                                                <div className="divide-y divide-slate-800 text-xs">
+                                                    {['early', 'mid', 'late'].map(pKey => {
+                                                        const hasCourse = m[pKey].length > 0;
+                                                        return (
+                                                            <div key={pKey} className={`p-3 ${hasCourse ? 'bg-slate-900' : 'bg-slate-800/30'}`}>
+                                                                <div className="font-bold text-slate-500 text-[10px] uppercase mb-2 tracking-wider">{pKey === 'early' ? '上旬 (1-10)' : pKey === 'mid' ? '中旬 (11-20)' : '下旬 (21+)'}</div>
+                                                                <div className="space-y-1.5">
+                                                                    {m[pKey].map((p, i) => (
+                                                                        <div key={i} className="flex justify-between items-center bg-indigo-900/30 p-1.5 rounded border border-indigo-900/50">
+                                                                            <span className="font-bold text-slate-300">{p.name} <span className="font-normal text-slate-500 scale-90 inline-block">{p.batch}</span></span>
+                                                                            <span className="font-bold text-indigo-400 bg-slate-800 px-1.5 rounded shadow-sm">{p.students}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                    {!hasCourse && <div className="text-slate-600 text-[10px] text-center italic">- 空閒 -</div>}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    <div className="p-3 bg-slate-800 flex justify-between items-center">
+                                                        <span className="font-bold text-slate-400">月月繪</span>
+                                                        <input type="number" value={m.monthly[0].students} onChange={e => handleMonthlyChange(idx, parseInt(e.target.value)||0)} className="w-16 text-center bg-slate-900 border border-slate-700 rounded px-1 py-0.5 outline-none focus:border-indigo-500 font-bold text-indigo-400 text-slate-200" />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {currentView === 'project' && <ProjectManagementView 
+                        personnel={personnel} 
+                        allPersonnelList={allPersonnelList} 
+                        masterCourses={masterCourses} 
+                        projects={projects}
+                        setProjects={setProjects}
+                        projectTasks={projectTasks}
+                        setProjectTasks={setProjectTasks}
+                        onAssignPerson={movePersonToCategory} 
+                        onDeleteCourse={handleDeleteCourse} 
+                    />}
+                    
+                    {currentView === 'attendance' && <WorkScheduleView 
+                        personnel={personnel} 
+                        categoryGroups={categoryGroups} 
+                        attendanceData={attendanceData}
+                        onUpdateAttendance={updateAttendance}
+                        onBatchUpdate={batchUpdateAttendance}
+                        taskTypes={taskTypes}
+                        setShowTaskTypeModal={setShowTaskTypeModal}
+                        wsSearchTerm={wsSearchTerm} setWsSearchTerm={setWsSearchTerm}
+                        wsShowBatchModal={wsShowBatchModal} setWsShowBatchModal={setWsShowBatchModal}
+                        wsBatchForm={wsBatchForm} setWsBatchForm={setWsBatchForm}
+                        dailyStats={dailyStats}
+                    />}
+                    
+                    {currentView === 'personnel' && <PersonnelView 
+                        personnel={personnel}
+                        categoryGroups={categoryGroups}
+                        setPersonnel={setPersonnel}
+                        savePersonnelData={(data) => syncDB('personnel', data)}
+                        setAddingToCategory={setAddingToCategory}
+                        setTempName={setTempName}
+                        addingToCategory={addingToCategory}
+                        tempName={tempName}
+                        handleConfirmAddPerson={handleConfirmAddPerson}
+                        setDeleteTarget={setDeleteTarget}
+                        setShowDeleteModal={setShowDeleteModal}
+                        onDragStart={onDragStart}
+                        onDragOver={onDragOver}
+                        onDrop={onDrop}
+                        dragOverContainer={dragOverContainer}
+                        setShowCategoryModal={setShowCategoryModal}
+                        setCollapsedPersonnelGroups={setCollapsedPersonnelGroups}
+                        collapsedPersonnelGroups={collapsedPersonnelGroups}
+                        handleRemovePerson={handleRemovePerson}
+                        projects={projects}
+                        projectTasks={projectTasks}
+                        attendanceData={attendanceData}
+                        masterCourses={masterCourses}
+                        taskTypes={taskTypes}
+                    />}
+                    
+                    {currentView === 'timeline' && <TimelineView masterCourses={masterCourses} />}
+                    
+                    {currentView === 'analytics' && <AnalyticsView personnel={personnel} attendanceData={attendanceData} taskTypes={taskTypes} categoryGroups={categoryGroups} />}
             </main>
 
             {/* Modals */}
@@ -1229,10 +1427,10 @@
                 </div>
               </div>
             )}
-        </div>
+         </div>
       );
-    };
-
+    }
+    
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
