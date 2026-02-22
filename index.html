@@ -1054,7 +1054,7 @@
               '線條訓練營': 'bootcamp',
               '色彩訓練營': 'camp_color',
               '速寫團練': 'sketch',
-              '月月繪': 'monthly_paint'
+              '月月繪': 'lec_monthly'
           });
 
           // 儀表板 UI 狀態
@@ -1342,20 +1342,20 @@
               }
           }, [taskTypes, movePersonToCategory, saveData]);
 
-          const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes }, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
+          const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes, courseMappings }, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
           const handleImportClick = () => { fileInputRef.current.click(); }
           const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (event) => { try { const imported = JSON.parse(event.target.result); 
                 setConfirmDialog({ show: true, message: "確認要匯入並覆蓋目前所有的資料嗎？", onConfirm: async () => {
                      if (imported.settings) { 
                          if (imported.settings.categoryGroups) { setCategoryGroups(imported.settings.categoryGroups); await saveData('categoryGroups', imported.settings.categoryGroups); } 
                          if (imported.settings.taskTypes) { setTaskTypes(imported.settings.taskTypes); await saveData('taskTypes', imported.settings.taskTypes); } 
+                         if (imported.settings.courseMappings) { setCourseMappings(imported.settings.courseMappings); await saveData('courseMappings', imported.settings.courseMappings); }
                      } 
                      if (imported.personnel) { setPersonnel(imported.personnel); await saveData('personnel', imported.personnel); } 
                      if (imported.masterCourses) { setMasterCourses(imported.masterCourses); await saveData('masterCourses', imported.masterCourses); } 
                      if (imported.attendanceData) { setAttendanceData(imported.attendanceData); await saveData('attendanceData', imported.attendanceData); } 
                      if (imported.monthlyData) { await saveData('monthlyData', imported.monthlyData); } 
                      if (imported.manualStats) { setManualStats(imported.manualStats); await saveData('manualStats', imported.manualStats); }
-                     if (imported.settings?.courseMappings) { setCourseMappings(imported.settings.courseMappings); await saveData('courseMappings', imported.settings.courseMappings); }
                      setSyncStatus('✅ 匯入完成'); 
                      setForceRefresh(p=>p+1);
                 }});
@@ -1396,11 +1396,10 @@
                   else if (students <= 4000) frontline = 10;
                   else if (students <= 5000) frontline = 12;
                   else if (students <= 6000) frontline = 13;
-                  else frontline = 13 + Math.ceil((students - 6000) / 1000) * 2; // 超過6000的簡單估算
+                  else frontline = 13 + Math.ceil((students - 6000) / 1000) * 2; 
               } else if (courseName.includes('月月繪')) {
                   frontline = 1;
               } else {
-                  // 未知課程預設使用 250 級距
                   frontline = Math.ceil(students / 250);
               }
               return { frontline };
@@ -1458,7 +1457,34 @@
                                     </div>
                                 </div>
                                 {isCourseListExpanded && (
-                                    <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold"><tr><th className="p-3 pl-6">課程名稱</th><th className="p-3">期數</th><th className="p-3">開始日期</th><th className="p-3">服務天數</th><th className="p-3">結束日期</th><th className="p-3">預估人數</th><th className="p-3 text-right pr-6">操作</th></tr></thead><tbody className="bg-slate-900 divide-y divide-slate-800">{masterCourses.length === 0 ? (<tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程。</td></tr>) : masterCourses.map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} isEditingAllowed={true} />)}</tbody></table></div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs text-slate-300">
+                                            <thead className="bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold">
+                                                <tr>
+                                                    <th className="p-3 pl-6">課程名稱</th>
+                                                    <th className="p-3">期數</th>
+                                                    <th className="p-3">開始日期</th>
+                                                    <th className="p-3">服務天數</th>
+                                                    <th className="p-3">結束日期</th>
+                                                    <th className="p-3">預估人數</th>
+                                                    <th className="p-3 text-right pr-6">操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-slate-900 divide-y divide-slate-800">
+                                                {masterCourses.length === 0 ? (
+                                                    <tr><td colSpan="7" className="p-8 text-center text-slate-500 italic">尚未建立任何課程。</td></tr>
+                                                ) : (
+                                                    [...masterCourses]
+                                                        .sort((a, b) => {
+                                                            if (!a.startDate) return 1;
+                                                            if (!b.startDate) return -1;
+                                                            return a.startDate.localeCompare(b.startDate);
+                                                        })
+                                                        .map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} isEditingAllowed={true} />)
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 )}
                             </div>
                             <div>
@@ -1470,7 +1496,6 @@
                                         const kCourses = new Set();
                                         const lecReqs = {};
 
-                                        // 收集該月份的所有課程以供收合時顯示，並計算該月講師總需求
                                         const uniqueCoursesInMonth = new Map();
                                         ['early', 'mid', 'late', 'monthly'].forEach(period => {
                                             m[period].forEach(c => {
@@ -1480,9 +1505,7 @@
 
                                         const activeCoursesList = Array.from(uniqueCoursesInMonth.values());
 
-                                        // 計算當月整體需求狀態 (一線 & 講師)
                                         activeCoursesList.forEach(c => {
-                                            // 1. 檢查一線人力
                                             const reqF = calculateManpower(c.name, c.students).frontline;
                                             const mappedCat = courseMappings[c.name];
                                             const availF = mappedCat && personnel[mappedCat] ? personnel[mappedCat].length : 0;
@@ -1490,7 +1513,6 @@
                                                 hasFrontlineShortage = true;
                                             }
 
-                                            // 2. 計算專項講師需求
                                             if (c.name.includes('透視')) {
                                                 kCourses.add('透視');
                                                 lecReqs['透視小灶'] = (lecReqs['透視小灶'] || 0) + 1;
@@ -1512,7 +1534,6 @@
                                             }
                                         });
 
-                                        // 將講師需求轉換成統計陣列並檢查是否短缺
                                         const lecturerStats = Object.entries(lecReqs).map(([label, reqCount]) => {
                                             const cat = categories.find(c => c.label === label);
                                             const availCount = cat && personnel[cat.id] ? personnel[cat.id].length : 0;
@@ -1551,7 +1572,6 @@
                                                 </div>
                                                 {!collapsedMonths[idx] && (
                                                     <div className="divide-y divide-slate-800/50">
-                                                        {/* 當月講師需求整合區塊 */}
                                                         <div className="bg-slate-800/60 p-3 text-xs border-b border-slate-800/50">
                                                             <div className="font-bold text-slate-300 mb-2 flex items-center gap-2">
                                                                 <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span> 當月講師需求
@@ -1616,7 +1636,6 @@
                                                                 </div>
                                                             );
                                                         })}
-                                                        {/* 月月繪獨立區塊 */}
                                                         <div className="p-3 bg-slate-800/80 flex flex-col gap-2">
                                                             <div className="flex justify-between items-center">
                                                                 <span className="font-bold text-slate-300 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>月月繪</span>
@@ -1891,7 +1910,7 @@
             
             {showDeleteModal && (
               <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                <div className="bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-slate-800">
+                <div className="bg-slate-900 rounded-2xl p-6 w-full max-sm shadow-2xl animate-in zoom-in-95 border border-slate-800">
                   <h3 className="font-bold text-lg text-slate-100 mb-2">確認刪除?</h3>
                   <p className="text-slate-400 text-sm mb-6">此動作無法復原，請確認是否要移除此項目。</p>
                   <div className="flex gap-3"><button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-800">取消</button><button onClick={handleRemovePerson} className="flex-1 py-2.5 rounded-xl font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-900/50">刪除</button></div>
