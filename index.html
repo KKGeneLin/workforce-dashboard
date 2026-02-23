@@ -236,6 +236,7 @@
         const [expandedGroups, setExpandedGroups] = useState({});
         const [popover, setPopover] = useState(null);
         const [popoverContext, setPopoverContext] = useState("");
+        const [batchError, setBatchError] = useState("");
         
         useEffect(() => {
            if (Object.keys(expandedGroups).length === 0 && (categoryGroups || []).length > 0) {
@@ -252,7 +253,6 @@
             } else {
                 const start = new Date(selectedMonth);
                 const day = start.getDay();
-                // 調整為週六起算 (6: 週六, 0: 週日, 1: 週一 ... 5: 週五)
                 const offset = day === 6 ? 0 : -(day + 1);
                 start.setDate(start.getDate() + offset); 
                 return Array.from({length: 7}, (_, i) => {
@@ -298,20 +298,33 @@
         };
         
         const handleBatchSubmit = () => {
-           if (!wsBatchForm.personId) return;
-           const start = new Date(wsBatchForm.startDate);
-           const end = new Date(wsBatchForm.endDate);
+           setBatchError("");
+           if (!wsBatchForm.personId) { setBatchError("請選擇人員"); return; }
+           if (!wsBatchForm.startDate || !wsBatchForm.endDate) { setBatchError("請設定開始與結束日期"); return; }
+           if (!wsBatchForm.type) { setBatchError("請選擇工作類型標籤"); return; }
+
+           const startParts = wsBatchForm.startDate.split('-');
+           const endParts = wsBatchForm.endDate.split('-');
+           const start = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+           const end = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+
+           if (start > end) { setBatchError("結束日期不能早於開始日期"); return; }
+
            const records = [];
            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
                 records.push({
                     employee_id: wsBatchForm.personId,
-                    date: d.toISOString().split('T')[0],
+                    date: `${y}-${m}-${day}`,
                     status: wsBatchForm.type,
                     context: wsBatchForm.context
                 });
            }
            onBatchUpdate(records);
            setWsShowBatchModal(false);
+           setWsBatchForm({ personId: '', startDate: '', endDate: '', type: (taskTypes||[])[0]?.id || '', context: '' });
         };
 
         return (
@@ -336,7 +349,13 @@
                         
                         {isEditingAllowed && (
                             <div className="flex gap-2 w-full sm:w-auto">
-                                <button onClick={() => setWsShowBatchModal(true)} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-500 transition-all active:scale-95">
+                                <button onClick={() => {
+                                    setBatchError("");
+                                    if (!wsBatchForm.type && (taskTypes||[]).length > 0) {
+                                        setWsBatchForm(prev => ({...prev, type: taskTypes[0].id}));
+                                    }
+                                    setWsShowBatchModal(true);
+                                }} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-500 transition-all active:scale-95">
                                     <Icons.Plus /> 批量排班
                                 </button>
                                 <button onClick={() => setShowTaskTypeModal(true)} className="flex items-center justify-center bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-2.5 rounded-xl transition-all shadow-sm hover:text-indigo-400" title="管理工作類型">
@@ -427,6 +446,43 @@
                         </div>
                     )}
                 </div>
+                
+                {/* Batch Modal */}
+                {wsShowBatchModal && isEditingAllowed && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                        <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-md p-8 border border-slate-700/50">
+                            <div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-black text-slate-100 tracking-wide">批量排班</h3><button onClick={() => setWsShowBatchModal(false)} className="text-slate-400 hover:text-slate-200 bg-slate-800/50 p-2 rounded-full transition-colors"><Icons.X /></button></div>
+                            <div className="space-y-5">
+                                {batchError && <div className="text-rose-400 text-sm font-bold bg-rose-950/50 border border-rose-900/50 p-3 rounded-xl flex items-center justify-center gap-2"><span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>{batchError}</div>}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">選擇人員</label>
+                                    <select className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer" value={wsBatchForm.personId} onChange={e => setWsBatchForm({...wsBatchForm, personId: e.target.value})}>
+                                        <option value="">-- 請選擇 --</option>
+                                        {(categoryGroups||[]).map(g => (
+                                            <optgroup key={g.name} label={g.name}>
+                                                {(g.items||[]).map(cat => (personnel[cat.id]||[]).map(p => <option key={p.id} value={p.id}>{p.name} ({cat.label})</option>))}
+                                            </optgroup>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">開始日期</label><input type="date" className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer" value={wsBatchForm.startDate} onChange={e => setWsBatchForm({...wsBatchForm, startDate: e.target.value})} /></div>
+                                    <div><label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">結束日期</label><input type="date" className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer" value={wsBatchForm.endDate} onChange={e => setWsBatchForm({...wsBatchForm, endDate: e.target.value})} /></div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">工作類型</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {(taskTypes||[]).map(t => (
+                                            <button key={t.id} onClick={() => setWsBatchForm({...wsBatchForm, type: t.id})} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all shadow-sm ${wsBatchForm.type === t.id ? 'ring-2 ring-offset-2 ring-offset-slate-900 ring-indigo-500 scale-105' : 'opacity-70 hover:opacity-100 border-transparent'} ${t.color}`}>{t.label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div><label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">內容/備註 (選填)</label><input type="text" className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder-slate-500" placeholder="如: 備課、開會..." value={wsBatchForm.context} onChange={e => setWsBatchForm({...wsBatchForm, context: e.target.value})} /></div>
+                                <div className="pt-2 flex gap-4"><button onClick={() => setWsShowBatchModal(false)} className="flex-1 py-3.5 rounded-xl font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all">取消</button><button onClick={handleBatchSubmit} className="flex-1 py-3.5 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg active:scale-95 transition-all">確認排班</button></div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     });
@@ -1131,7 +1187,7 @@
                   <div className="space-y-2">
                       <div className="text-xs font-bold text-slate-400 mb-2 border-b border-slate-700/50 pb-2">各課程學生數</div>
                       {entries.sort((a,b) => b[1] - a[1]).map(([name, count]) => (
-                          <div key={name} className="flex justify-between items-center text-xs">
+                          <div key={name} className="flex justify-between items-center text-xs gap-6">
                               <span className="text-slate-300 font-medium">{name}</span>
                               <span className="font-bold text-indigo-400">{count} <span className="text-[10px] text-slate-500 font-normal">人</span></span>
                           </div>
