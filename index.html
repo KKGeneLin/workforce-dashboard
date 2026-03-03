@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>人力需求測算儀表板 (結構重構版)</title>
+  <title>統合管理儀表板 (HR + PM)</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -45,9 +45,11 @@
     .task-block { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border-radius: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: all 0.2s ease; padding: 0 4px; position: relative; letter-spacing: 0.5px; }
     .task-block:hover { transform: translateY(-2px) scale(1.02); z-index: 20; box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.2); filter: brightness(1.1); }
     .view-month .task-block:hover::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background-color: #f8fafc; color: #0f172a; padding: 6px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; margin-bottom: 6px; pointer-events: none; z-index: 50; font-weight: 800; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
-    input[type="date"]::-webkit-calendar-picker-indicator, input[type="month"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; transition: 0.2s; filter: invert(1); }
-    input[type="date"]::-webkit-calendar-picker-indicator:hover, input[type="month"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+    input[type="date"]::-webkit-calendar-picker-indicator, input[type="month"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; transition: 0.2s; filter: invert(1); }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover, input[type="month"]::-webkit-calendar-picker-indicator:hover, input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
     select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+    .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body class="dark">
@@ -67,31 +69,47 @@
 
     const generateId = () => Math.random().toString(36).substr(2, 9);
 
+    // --- 圖標整合 (統一接收 size 與 className 屬性) ---
     const Icons = {
-      Dashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
-      Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-      Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
-      ClipboardCheck: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>,
-      Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
-      Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-      ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>,
-      ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 15-6-6-6 6"/></svg>,
-      ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>,
-      ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>,
-      Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.5 19c0-1.7-1.3-3-3-3h-1.1c-.1-2.6-2.1-4.6-4.6-4.8C6 11.3 3.8 13.5 4 16.3c.1 1.5 1.5 2.7 3 2.7h10.5Z"/><path d="M12 3v9"/><path d="m8 8 4-4 4 4"/></svg>,
-      X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
-      Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
-      Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-      Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-      Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
-      Briefcase: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
-      List: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
-      BarChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>,
-      UserIcon: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-      Database: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>,
-      Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      Dashboard: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+      Users: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+      Calendar: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+      CalendarDays: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>,
+      ClipboardCheck: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>,
+      Plus: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+      Trash: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+      Edit: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>,
+      ChevronDown: ({size=18, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>,
+      ChevronUp: ({size=18, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 15-6-6-6 6"/></svg>,
+      ChevronLeft: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>,
+      ChevronRight: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>,
+      Cloud: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.5 19c0-1.7-1.3-3-3-3h-1.1c-.1-2.6-2.1-4.6-4.6-4.8C6 11.3 3.8 13.5 4 16.3c.1 1.5 1.5 2.7 3 2.7h10.5Z"/><path d="M12 3v9"/><path d="m8 8 4-4 4 4"/></svg>,
+      X: ({size=24, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+      Search: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+      Download: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Upload: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+      Settings: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+      Briefcase: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+      List: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+      BarChart: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>,
+      UserIcon: ({size=24, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+      Database: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>,
+      Lock: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>,
+      Unlock: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>,
+      Key: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>,
+      KanbanSquare: ({size=18, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/></svg>,
+      GanttChartSquare: ({size=18, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 8h7"/><path d="M8 12h6"/><path d="M11 16h5"/></svg>,
+      FileText: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>,
+      ExternalLink: ({size=14, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>,
+      Maximize2: ({size=14, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>,
+      Inbox: ({size=20, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>,
+      Tag: ({size=10, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42l-8.704-8.704z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>,
+      Clock: ({size=12, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      Sparkles: ({size=16, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>,
+      LinkIcon: ({size=12, className=""}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
     };
 
+    // --- 初始化數據 ---
     const DEFAULT_CATEGORY_GROUPS = [
         { name: '管理', items: [{ id: 'supervisor', label: '主管', type: 'admin' }, { id: 'leader', label: '組長', type: 'admin' }] },
         { name: '講師群', items: [
@@ -129,7 +147,69 @@
         { label: '速寫團練', value: 'sketch', days: 60 },
     ];
 
+    // --- PM 專用初始化數據 ---
+    const INITIAL_KANBAN_COLUMNS = ['需求評估與整理', '草圖階段', '草案階段', '成品製作', '萬事屋複檢', '已上傳結案'];
+
+    const initialProjects = [
+      { id: 'P1', name: '2025 透視課件全面翻修 (T系列)', status: '進行中', progress: 45, pm: '大雪', startDate: '2025-02-13', endDate: '2025-07-20', docLinks: [{title: '素材審查表', url: 'https://shimo.im/sheets/m4kMMOVlm5cvMjkD/0qqka'}] },
+      { id: 'P5', name: 'TP04：透視訓練營 (夏季)', status: '準備中', progress: 15, pm: '哥特', startDate: '2025-06-09', endDate: '2025-08-09', docLinks: [{title: '訓練營總表', url: 'https://shimo.im/'}] },
+      { id: 'P2', name: 'P系列每日作業自檢與規劃', status: '進行中', progress: 60, pm: '浮浮', startDate: '2025-01-11', endDate: '2025-08-16', docLinks: [] },
+      { id: 'P3', name: '色彩課件全面翻修 (S系列)', status: '準備中', progress: 10, pm: '大雪', startDate: '2025-04-01', endDate: '2025-08-30', docLinks: [] },
+      { id: 'P4', name: '護衛艦/新訓產品迭代', status: '評估中', progress: 0, pm: '哥特', startDate: '2025-05-01', endDate: '2025-06-30', docLinks: [] },
+    ];
+
+    const initialTasks = [
+      { id: 'T1', title: 'L1-A00 作業翻修 (草圖與草案)', project: 'P1', status: '已上傳結案', assignee: 'YUC', startDate: '2025-02-13', endDate: '2025-03-13', docLinks: [] },
+      { id: 'T2', title: 'L3-B02 翻修與優化', project: 'P1', status: '萬事屋複檢', assignee: '海因', startDate: '2025-02-13', endDate: '2025-03-29', docLinks: [] },
+      { id: 'T3', title: 'L4-A01-2 節點重製', project: 'P1', status: '成品製作', assignee: '小明', startDate: '2025-02-15', endDate: '2025-03-05', docLinks: [] },
+      { id: 'T4', title: 'L5-A01/02 減少節點與趣味化', project: 'P1', status: '需求評估與整理', assignee: '大雪', startDate: '2025-04-01', endDate: '2025-04-15', docLinks: [] },
+      { id: 'T12', title: '整合上期迭代方向 (提供運營)', project: 'P5', status: '已上傳結案', assignee: '大雪', startDate: '2025-04-10', endDate: '2025-04-15', tags: ['籌備A', '課研K'], docLinks: [{title: '迭代方向大綱', url: 'https://shimo.im/sheets/m4kMMOVlm5cvMjkD/0qqka'}] },
+      { id: 'T13', title: '招生簡章文案撰寫 (大綱/草稿)', project: 'P5', status: '草圖階段', assignee: '哥特', startDate: '2025-04-15', endDate: '2025-04-20', tags: ['籌備A', '運營Y'], docLinks: [] },
+      { id: 'T5', title: 'T_P A系列自檢 (草案與成品)', project: 'P2', status: '已上傳結案', assignee: '浮浮', startDate: '2025-06-10', endDate: '2025-07-10', docLinks: [] },
+    ];
+
+    const initialInstructors = [
+      { id: 'I1', name: '安塵', project: 'P4', date: '2025-05-15', startTime: '20:00', endTime: '22:00', classCount: 1, classNames: ['護衛艦答疑 (安)'], task: '線上答疑與作業點評' },
+      { id: 'I2', name: '竹熊', project: 'P4', date: '2025-06-10', startTime: '19:00', endTime: '21:00', classCount: 1, classNames: ['新訓作業帶畫試講'], task: '試講與流程確認' },
+      { id: 'I3', name: '猫虫', project: 'P3', date: '2025-07-01', startTime: '20:00', endTime: '22:00', classCount: 4, classNames: ['構成正課 1', '構成正課 2', '構成正課 3', '構成正課 4'], task: '正課直播授課' },
+    ];
+
+    const initialTeam = [
+      { id: 'M1', name: '大雪', role: '課程/專案經理' },
+      { id: 'M2', name: '哥特', role: '產品/專案經理' },
+      { id: 'M3', name: 'YUC', role: '課件製作' },
+      { id: 'M4', name: '小明', role: '課件製作' },
+      { id: 'M5', name: '海因', role: '課件製作' },
+      { id: 'M6', name: '浮浮', role: '課件製作' },
+      { id: 'M7', name: '竹熊', role: '講師/製作' },
+    ];
+
     // --- UI Components ---
+    const StatusBadge = ({ status }) => {
+      const colors = {
+        '進行中': 'bg-blue-900/40 text-blue-400 border-blue-700/50',
+        '準備中': 'bg-amber-900/40 text-amber-400 border-amber-700/50',
+        '評估中': 'bg-slate-800 text-slate-300 border-slate-600',
+        '需求評估與整理': 'bg-slate-800 text-slate-300 border-slate-600',
+        '草圖階段': 'bg-sky-900/40 text-sky-400 border-sky-700/50',
+        '草案階段': 'bg-indigo-900/40 text-indigo-400 border-indigo-700/50',
+        '成品製作': 'bg-fuchsia-900/40 text-fuchsia-400 border-fuchsia-700/50',
+        '萬事屋複檢': 'bg-orange-900/40 text-orange-400 border-orange-700/50',
+        '已上傳結案': 'bg-emerald-900/40 text-emerald-400 border-emerald-700/50',
+      };
+      return (
+        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${colors[status] || 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+          {status}
+        </span>
+      );
+    };
+
+    const ProgressBar = ({ progress }) => (
+      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+        <div className="bg-gradient-to-r from-indigo-500 to-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+      </div>
+    );
+
     const KPICard = memo(({ title, value, icon, color, glow, details }) => (
         <div className="relative bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/80 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group z-10 hover:z-20">
             <div className="absolute inset-0 overflow-hidden rounded-3xl z-0 pointer-events-none">
@@ -180,7 +260,7 @@
         </tr>
     ));
 
-    // 1. 數據儀表板 (DashboardView)
+    // --- 子視圖：人力系統 ---
     const DashboardView = memo(({ masterCourses, courseMappings, personnel, calculateManpower, getHealthStatus }) => {
         const [selectedMonth, setSelectedMonth] = useState(() => {
             const d = new Date();
@@ -279,8 +359,7 @@
         );
     });
 
-    // 2. 預測表 (ForecastView)
-    const ForecastView = memo(({ stats, schedule, courseMappings, personnel, calculateManpower, getHealthStatus, monthlyData, handleMonthlyChange, collapsedMonths, setCollapsedMonths, categories }) => {
+    const ForecastView = memo(({ stats, schedule, courseMappings, personnel, calculateManpower, getHealthStatus, monthlyData, handleMonthlyChange, collapsedMonths, setCollapsedMonths, categories, isAdmin }) => {
         return (
             <div className="animate-fade-in-up max-w-[1400px] mx-auto space-y-8 pb-24">
                 <div className="bg-slate-900/60 backdrop-blur-xl p-5 rounded-3xl shadow-lg border border-slate-800/80 flex items-center gap-4 sticky top-4 z-30">
@@ -457,7 +536,7 @@
                                             <div className="p-4 bg-slate-800/30 flex flex-col gap-3 flex-1 border-t border-slate-800/80">
                                                 <div className="flex justify-between items-center">
                                                     <span className="font-black text-slate-200 tracking-wide flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></span>月月繪</span>
-                                                    <input type="number" value={m.monthly[0]?.students||0} onChange={e => handleMonthlyChange(idx, parseInt(e.target.value)||0)} className="w-20 text-center bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 font-black text-cyan-400 text-sm shadow-inner transition-all" placeholder="人數" />
+                                                    <input type="number" disabled={!isAdmin} value={m.monthly[0]?.students||0} onChange={e => handleMonthlyChange(idx, parseInt(e.target.value)||0)} className="w-20 text-center bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 font-black text-cyan-400 text-sm shadow-inner transition-all disabled:opacity-50 disabled:cursor-not-allowed" placeholder="人數" />
                                                 </div>
                                             </div>
                                         </div>
@@ -471,7 +550,6 @@
         );
     });
 
-    // 3. 課程時間軸 (TimelineView)
     const TimelineView = memo(({ masterCourses }) => {
         const [year, setYear] = useState(new Date().getFullYear());
         const months = Array.from({length: 12}, (_, i) => i + 1);
@@ -533,7 +611,6 @@
         );
     });
 
-    // 4. 工作與排班表 (WorkScheduleView)
     const WorkScheduleView = memo(({ personnel, categoryGroups, attendanceData, onUpdateAttendance, onBatchUpdate, taskTypes, setShowTaskTypeModal, wsSearchTerm, setWsSearchTerm, dailyStats, wsShowBatchModal, setWsShowBatchModal, wsBatchForm, setWsBatchForm, isEditingAllowed }) => {
         const [selectedMonth, setSelectedMonth] = useState(new Date());
         const [viewMode, setViewMode] = useState('week'); 
@@ -805,7 +882,7 @@
     const DatabaseView = memo(({ 
         masterCourses, handleUpdateCourse, handleDeleteCourse, setShowCourseModal, setShowMappingModal,
         personnel, categoryGroups, setShowCategoryModal, onUpdatePersonnel,
-        taskTypes, setShowTaskTypeModal, attendanceData, updateAttendance, batchUpdateAttendance, wsSearchTerm, setWsSearchTerm, dailyStats, wsShowBatchModal, setWsShowBatchModal, wsBatchForm, setWsBatchForm
+        taskTypes, setShowTaskTypeModal, attendanceData, updateAttendance, batchUpdateAttendance, wsSearchTerm, setWsSearchTerm, dailyStats, wsShowBatchModal, setWsShowBatchModal, wsBatchForm, setWsBatchForm, isAdmin
     }) => {
         const [activeDbTab, setActiveDbTab] = useState('courses');
 
@@ -870,7 +947,7 @@
             setShowEditModal(false);
         };
         
-        // 修正後的加入手動標籤功能
+        // 加入手動標籤功能
         const addTag = () => {
             if (newCustomTag.label.trim()) {
                 setEditingPerson(prev => ({
@@ -913,10 +990,12 @@
                                 <h3 className="text-lg font-black text-slate-100">課程管理表</h3>
                                 <p className="text-xs text-slate-500 mt-1">管理所有開設計畫與人數預估</p>
                             </div>
-                            <div className="flex gap-3 w-full sm:w-auto">
-                                <button onClick={() => setShowMappingModal(true)} className="flex-1 sm:flex-none flex justify-center items-center gap-2 text-xs font-bold text-slate-300 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 px-5 py-2.5 rounded-xl transition-all">⚙️ 人力連動設定</button>
-                                <button onClick={() => setShowCourseModal(true)} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-500 shadow-lg transition-all"><Icons.Plus /> 新增課程</button>
-                            </div>
+                            {isAdmin && (
+                                <div className="flex gap-3 w-full sm:w-auto">
+                                    <button onClick={() => setShowMappingModal(true)} className="flex-1 sm:flex-none flex justify-center items-center gap-2 text-xs font-bold text-slate-300 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 px-5 py-2.5 rounded-xl transition-all">⚙️ 人力連動設定</button>
+                                    <button onClick={() => setShowCourseModal(true)} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-500 shadow-lg transition-all"><Icons.Plus /> 新增課程</button>
+                                </div>
+                            )}
                         </div>
                         <div className="overflow-x-auto p-2">
                             <table className="w-full text-left text-xs text-slate-300 min-w-[800px]">
@@ -933,11 +1012,11 @@
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/30">
                                     {(masterCourses || []).length === 0 ? (
-                                        <tr><td colSpan="7" className="p-16 text-center text-slate-500 font-bold bg-slate-800/20 rounded-2xl m-4 tracking-widest">尚無課程，點擊右上角新增。</td></tr>
+                                        <tr><td colSpan="7" className="p-16 text-center text-slate-500 font-bold bg-slate-800/20 rounded-2xl m-4 tracking-widest">尚無課程。</td></tr>
                                     ) : (
                                         [...(masterCourses || [])]
                                             .sort((a, b) => (!a.startDate ? 1 : !b.startDate ? -1 : a.startDate.localeCompare(b.startDate)))
-                                            .map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} isEditingAllowed={true} />)
+                                            .map(c => <CourseRow key={c.id} course={c} onUpdate={handleUpdateCourse} onDelete={handleDeleteCourse} isEditingAllowed={isAdmin} />)
                                     )}
                                 </tbody>
                             </table>
@@ -958,8 +1037,12 @@
                                     <span className="text-slate-500"><Icons.Search /></span>
                                     <input className="bg-transparent border-none outline-none text-sm w-full text-slate-200" placeholder="搜尋姓名..." value={personnelSearch} onChange={e => setPersonnelSearch(e.target.value)} />
                                 </div>
-                                <button onClick={() => setShowCategoryModal(true)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold transition-all">管理分類結構</button>
-                                <button onClick={openAddPersonModal} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2"><Icons.Plus /> 新增人員</button>
+                                {isAdmin && (
+                                    <>
+                                        <button onClick={() => setShowCategoryModal(true)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold transition-all">管理分類結構</button>
+                                        <button onClick={openAddPersonModal} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2"><Icons.Plus /> 新增人員</button>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -989,9 +1072,11 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <button onClick={() => openEditModal(p)} className="p-2.5 text-slate-400 hover:text-white bg-slate-900/50 hover:bg-indigo-600 rounded-xl transition-all shadow-sm">
-                                            <Icons.Edit />
-                                        </button>
+                                        {isAdmin && (
+                                            <button onClick={() => openEditModal(p)} className="p-2.5 text-slate-400 hover:text-white bg-slate-900/50 hover:bg-indigo-600 rounded-xl transition-all shadow-sm">
+                                                <Icons.Edit />
+                                            </button>
+                                        )}
                                     </div>
                                 ))
                             )}
@@ -1042,11 +1127,552 @@
 
                 {/* 工作表 Tab */}
                 {activeDbTab === 'tasks' && (
-                    <WorkScheduleView personnel={personnel} categoryGroups={categoryGroups} attendanceData={attendanceData} onUpdateAttendance={updateAttendance} onBatchUpdate={batchUpdateAttendance} taskTypes={taskTypes} setShowTaskTypeModal={setShowTaskTypeModal} wsSearchTerm={wsSearchTerm} setWsSearchTerm={setWsSearchTerm} dailyStats={dailyStats} wsShowBatchModal={wsShowBatchModal} setWsShowBatchModal={setWsShowBatchModal} wsBatchForm={wsBatchForm} setWsBatchForm={setWsBatchForm} isEditingAllowed={true} />
+                    <WorkScheduleView personnel={personnel} categoryGroups={categoryGroups} attendanceData={attendanceData} onUpdateAttendance={updateAttendance} onBatchUpdate={batchUpdateAttendance} taskTypes={taskTypes} setShowTaskTypeModal={setShowTaskTypeModal} wsSearchTerm={wsSearchTerm} setWsSearchTerm={setWsSearchTerm} dailyStats={dailyStats} wsShowBatchModal={wsShowBatchModal} setWsShowBatchModal={setWsShowBatchModal} wsBatchForm={wsBatchForm} setWsBatchForm={setWsBatchForm} isEditingAllowed={isAdmin} />
                 )}
             </div>
         );
     });
+
+    // --- PM 專屬視圖組件 ---
+    const PmProjectsView = memo(({ projects, tasks, kanbanCols, handleOpenModal, handleDelete, moveProject }) => (
+      <div className="space-y-6 fade-in max-w-[1400px] mx-auto pb-24">
+        <div className="bg-slate-900/60 backdrop-blur-xl p-5 rounded-3xl shadow-lg border border-slate-800/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-4 z-30">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 text-white"><Icons.Briefcase /></div>
+            <div>
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400 tracking-wide">專案總覽</h2>
+              <p className="text-xs text-slate-500 font-bold mt-1">掌握所有大型專案與訓練營生命週期</p>
+            </div>
+          </div>
+          <button onClick={() => handleOpenModal('projects')} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-500 shadow-lg active:scale-95 transition-all font-bold">
+            <Icons.Plus /> 新增專案
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {projects.map((p, pIdx) => (
+            <div key={p.id} className="bg-slate-800/40 p-6 rounded-3xl border border-slate-700/50 shadow-lg hover:shadow-2xl hover:bg-slate-800/80 hover:-translate-y-1 transition-all duration-300 group flex flex-col relative overflow-hidden">
+              
+              {/* 專案卡片右上角操作區 */}
+              <div className="flex justify-between items-start mb-5">
+                <StatusBadge status={p.status} />
+                <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/50 p-1 rounded-lg border border-slate-700/50 relative z-10">
+                  <button onClick={() => moveProject(pIdx, -1)} disabled={pIdx === 0} className="p-1 text-slate-400 hover:text-indigo-400 disabled:opacity-30 transition-colors" title="前移"><Icons.ChevronLeft size={16}/></button>
+                  <button onClick={() => moveProject(pIdx, 1)} disabled={pIdx === projects.length - 1} className="p-1 text-slate-400 hover:text-indigo-400 disabled:opacity-30 transition-colors" title="後移"><Icons.ChevronRight size={16}/></button>
+                  <div className="w-px bg-slate-700 mx-0.5"></div>
+                  <button onClick={() => handleOpenModal('projects', p)} className="p-1.5 text-slate-400 hover:text-indigo-400 rounded-md transition-colors"><Icons.Edit /></button>
+                  <button onClick={() => handleDelete('projects', p.id)} className="p-1.5 text-slate-400 hover:text-rose-400 rounded-md transition-colors"><Icons.Trash /></button>
+                </div>
+              </div>
+              
+              <h3 className="font-bold text-lg text-slate-100 mb-3 leading-snug">{p.name}</h3>
+              
+              <div className="flex flex-col gap-3 mb-5">
+                <div className="flex items-center gap-2 text-sm text-slate-400 font-medium">
+                  <div className="w-6 h-6 rounded-full bg-indigo-900/50 text-indigo-300 border border-indigo-700/50 flex items-center justify-center text-[10px] font-bold">{p.pm.charAt(0)}</div>
+                  PM: <span className="text-slate-300">{p.pm}</span>
+                </div>
+                
+                {/* 渲染複數文件連結 */}
+                {p.docLinks && p.docLinks.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {p.docLinks.map((link, idx) => (
+                      <a key={idx} href={link.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[11px] font-bold bg-blue-900/30 text-blue-300 border border-blue-800/50 px-2 py-1 rounded-md hover:bg-blue-800/50 transition-colors z-10" title="前往線上文件">
+                        <Icons.FileText /> {link.title || '文件連結'} <Icons.ExternalLink />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-2 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400 font-medium">整體進度</span>
+                  <span className="font-bold text-slate-200">{p.progress}%</span>
+                </div>
+                <ProgressBar progress={p.progress} />
+              </div>
+
+              <div className="mt-auto pt-5 border-t border-slate-700/50">
+                <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">包含之任務/階段拆解 ({tasks.filter(t => t.project === p.id).length})</h4>
+                <div className="space-y-2.5">
+                  {tasks.filter(t => t.project === p.id).length > 0 ? (
+                    tasks.filter(t => t.project === p.id).slice(0, 4).map(task => (
+                      <div key={task.id} className="flex justify-between items-center text-sm group/task relative pl-3">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-600"></div>
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          {task.tags && task.tags.length > 0 && (task.tags[0].includes('A') || task.tags[0].includes('D')) ? (
+                            <span className="text-[10px] shrink-0 font-bold bg-amber-900/30 text-amber-400 px-1.5 py-0.5 rounded border border-amber-700/50">{task.tags[0]}</span>
+                          ) : null}
+                          <span className="text-slate-300 truncate font-medium text-[13px]">{task.title}</span>
+                        </div>
+                        <span className="text-[10px] shrink-0 px-2 py-0.5 rounded bg-slate-900/50 border border-slate-700 text-slate-400 font-semibold">{task.status}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-4 text-slate-500 bg-slate-900/30 rounded-xl border border-dashed border-slate-700">
+                      <Icons.Inbox className="mb-1 opacity-50"/>
+                      <span className="text-xs font-medium">尚未建立專案任務</span>
+                    </div>
+                  )}
+                  {tasks.filter(t => t.project === p.id).length > 4 && (
+                    <div className="text-xs text-center text-slate-500 pt-1 font-medium">... 還有 {tasks.filter(t => t.project === p.id).length - 4} 項任務</div>
+                  )}
+                </div>
+              </div>
+
+              {/* 點擊展開詳情按鈕 */}
+              <div className="mt-6 pt-4 border-t border-slate-700/50 flex justify-between items-center text-xs text-slate-400 font-medium bg-slate-900/30 -mx-6 -mb-6 p-4 rounded-b-3xl">
+                <span className="flex items-center gap-1.5"><Icons.CalendarDays /> {p.startDate.replace(/-/g, '/')}</span>
+                <button 
+                  onClick={() => handleOpenModal('projectDetails', p)}
+                  className="flex items-center gap-1 text-indigo-400 font-bold hover:text-indigo-300 transition-colors z-10 bg-indigo-900/30 border border-indigo-700/50 px-3 py-1.5 rounded-lg"
+                >
+                  <Icons.Maximize2 /> 查看專案詳情
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ));
+
+    const TasksKanbanView = memo(({ projects, tasks, kanbanCols, handleOpenModal, handleDelete, moveProject, moveColumn, moveTask }) => (
+      <div className="space-y-6 fade-in max-w-[1400px] mx-auto pb-24 h-[calc(100vh-120px)] flex flex-col">
+        <div className="bg-slate-900/60 backdrop-blur-xl p-5 rounded-3xl shadow-lg border border-slate-800/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 text-white"><Icons.KanbanSquare /></div>
+            <div>
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400 tracking-wide">課件製作 / 任務看板</h2>
+              <p className="text-xs text-slate-500 font-bold mt-1">基於 SOP 的敏捷工作流與階段審查</p>
+            </div>
+          </div>
+          <button onClick={() => handleOpenModal('tasks')} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-500 shadow-lg active:scale-95 transition-all font-bold">
+            <Icons.Plus /> 新增任務
+          </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto space-y-6 pb-8 pr-2 custom-scrollbar">
+          {projects.map((project, pIdx) => {
+            const projectTasks = tasks.filter(t => t.project === project.id);
+            if (projectTasks.length === 0) return null;
+
+            return (
+              <div key={project.id} className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700/50 shadow-lg">
+                {/* 泳道標題區 */}
+                <div className="flex items-center justify-between mb-5 border-b border-slate-700/50 pb-4 group/header sticky left-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-6 bg-gradient-to-b from-indigo-500 to-blue-500 rounded-full"></div>
+                    <h3 className="font-bold text-lg text-slate-100 tracking-wide">{project.name}</h3>
+                    <span className="bg-indigo-900/40 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold border border-indigo-700/50">
+                      {projectTasks.length} 任務
+                    </span>
+                  </div>
+                  {/* 泳道 上下移動浮動控制列 */}
+                  <div className="flex gap-0.5 opacity-0 group-hover/header:opacity-100 transition-opacity bg-slate-900/50 shadow-sm border border-slate-700 rounded-lg overflow-hidden">
+                    <button onClick={() => moveProject(pIdx, -1)} disabled={pIdx === 0} className="p-1.5 text-slate-400 hover:text-indigo-400 disabled:opacity-30 transition-colors" title="向上移"><Icons.ChevronUp /></button>
+                    <div className="w-px bg-slate-700"></div>
+                    <button onClick={() => moveProject(pIdx, 1)} disabled={pIdx === projects.length - 1} className="p-1.5 text-slate-400 hover:text-indigo-400 disabled:opacity-30 transition-colors" title="向下移"><Icons.ChevronDown /></button>
+                  </div>
+                </div>
+                
+                {/* 看板列 */}
+                <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+                  {kanbanCols.map((col, cIdx) => (
+                    <div key={col} className="bg-slate-900/50 rounded-2xl p-3 min-w-[300px] flex flex-col border border-slate-800">
+                      {/* 階段標題 */}
+                      <div className="flex justify-between items-center mb-4 px-1 group/colHeader">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-[14px] text-slate-300">{col}</h4>
+                          <span className="bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-bold text-xs">
+                            {projectTasks.filter(t => t.status === col).length}
+                          </span>
+                        </div>
+                        {/* 階段 左右移動浮動控制列 */}
+                        <div className="flex opacity-0 group-hover/colHeader:opacity-100 transition-opacity bg-slate-800 shadow-sm border border-slate-700 rounded-lg overflow-hidden">
+                           <button onClick={() => moveColumn(cIdx, -1)} disabled={cIdx === 0} className="p-1 text-slate-400 hover:text-indigo-400 disabled:opacity-30 transition-colors" title="向左移"><Icons.ChevronLeft size={16}/></button>
+                           <div className="w-px bg-slate-700"></div>
+                           <button onClick={() => moveColumn(cIdx, 1)} disabled={cIdx === kanbanCols.length - 1} className="p-1 text-slate-400 hover:text-indigo-400 disabled:opacity-30 transition-colors" title="向右移"><Icons.ChevronRight size={16}/></button>
+                        </div>
+                      </div>
+
+                      {/* 任務卡片 */}
+                      <div className="space-y-3 flex-1">
+                        {projectTasks.filter(t => t.status === col).map(task => (
+                          <div key={task.id} className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-sm hover:shadow-md hover:border-indigo-500/50 transition-all duration-300 group/card relative flex flex-col gap-3">
+                            
+                            {/* 卡片右上角浮動控制列 */}
+                            <div className="absolute top-3 right-3 flex opacity-0 group-hover/card:opacity-100 transition-opacity bg-slate-900/90 backdrop-blur-sm shadow-md border border-slate-700 rounded-lg overflow-hidden z-10">
+                              <button onClick={() => moveTask(task, -1)} className="p-1.5 text-slate-400 hover:text-indigo-400 transition-colors" title="上移"><Icons.ChevronUp /></button>
+                              <button onClick={() => moveTask(task, 1)} className="p-1.5 text-slate-400 hover:text-indigo-400 transition-colors" title="下移"><Icons.ChevronDown /></button>
+                              <div className="w-px bg-slate-700 my-1"></div>
+                              
+                              {/* 提供任務第一個連結做為快捷按鈕 */}
+                              {task.docLinks && task.docLinks.length > 0 && (
+                                <a href={task.docLinks[0].url} target="_blank" rel="noreferrer" className="p-1.5 text-slate-400 hover:text-blue-400 transition-colors" title={`開啟文件: ${task.docLinks[0].title}`}><Icons.FileText /></a>
+                              )}
+                              
+                              <button onClick={() => handleOpenModal('tasks', task)} className="p-1.5 text-slate-400 hover:text-indigo-400 transition-colors" title="編輯"><Icons.Edit /></button>
+                              <button onClick={() => handleDelete('tasks', task.id)} className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors"><Icons.Trash /></button>
+                            </div>
+                            
+                            {/* Tags 標籤 */}
+                            {task.tags && task.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pr-20">
+                                {task.tags.map(tag => (
+                                  <span key={tag} className="flex items-center gap-1 bg-amber-900/30 text-amber-400 border border-amber-700/50 px-2 py-0.5 rounded-md text-[11px] font-bold shadow-sm">
+                                    <Icons.Tag /> {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <h5 className="font-bold text-slate-200 text-[14px] leading-snug pr-8">{task.title}</h5>
+                            
+                            <div className="flex justify-between items-end mt-1">
+                              <span className="flex items-center gap-1.5 bg-slate-900/50 border border-slate-700 text-slate-300 px-2 py-1 rounded-lg text-xs font-semibold">
+                                <div className="w-4 h-4 rounded-full bg-indigo-900/50 text-indigo-300 border border-indigo-700 flex items-center justify-center text-[8px] font-bold">{task.assignee.charAt(0)}</div>
+                                {task.assignee}
+                              </span>
+                              <div className="flex flex-col items-end gap-1">
+                                {task.docLinks && task.docLinks.length > 0 && (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/50">
+                                    {task.docLinks.length} 份文件
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1 text-slate-400 font-semibold text-[11px]">
+                                  <Icons.Clock /> {task.endDate?.substring(5).replace('-', '/')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ));
+
+    const InstructorsView = memo(({ instructors, projects, handleOpenModal, handleDelete }) => (
+      <div className="space-y-6 fade-in max-w-[1400px] mx-auto pb-24">
+        <div className="bg-slate-900/60 backdrop-blur-xl p-5 rounded-3xl shadow-lg border border-slate-800/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-4 z-30">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 text-white"><Icons.CalendarDays /></div>
+            <div>
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400 tracking-wide">講師排程表</h2>
+              <p className="text-xs text-slate-500 font-bold mt-1">統籌內外部講師的授課時程與交付</p>
+            </div>
+          </div>
+          <button onClick={() => handleOpenModal('instructors')} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-500 shadow-lg active:scale-95 transition-all font-bold">
+            <Icons.Plus /> 新增排程
+          </button>
+        </div>
+        
+        <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-800/80 overflow-hidden">
+          <div className="overflow-x-auto p-2">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead className="text-slate-500 uppercase tracking-widest font-black text-[10px] border-b border-slate-800/80">
+                <tr>
+                  <th className="px-6 py-4">講師 / 人員</th>
+                  <th className="px-6 py-4">專案 / 活動</th>
+                  <th className="px-6 py-4">授課時間</th>
+                  <th className="px-6 py-4">課堂數/課節名稱</th>
+                  <th className="px-6 py-4">負責事項</th>
+                  <th className="px-6 py-4 text-right">管理</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/30 text-slate-300">
+                {instructors.map(inst => (
+                  <tr key={inst.id} className="hover:bg-slate-800/40 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-900 to-purple-900 border border-indigo-700 flex items-center justify-center text-indigo-300 font-bold text-sm shadow-inner">
+                          {inst.name.charAt(0)}
+                        </div>
+                        <span className="font-bold text-slate-200">{inst.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium">{projects.find(p => p.id === inst.project)?.name || inst.project}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-bold text-slate-200">{inst.date.replace(/-/g, '/')}</span>
+                        <span className="text-xs font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700 w-max">{inst.startTime} - {inst.endTime}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-indigo-400 mb-1.5">{inst.classCount || 1} 堂</div>
+                      <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                        {(Array.isArray(inst.classNames) ? inst.classNames : [inst.classNames]).filter(Boolean).map((cname, idx) => (
+                          <span key={idx} className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-700 truncate max-w-full" title={cname}>
+                            {cname}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-400">{inst.task}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleOpenModal('instructors', inst)} className="p-2 text-slate-400 hover:text-indigo-400 bg-slate-900/50 hover:bg-slate-800 border border-slate-700 rounded-lg transition-all shadow-sm"><Icons.Edit /></button>
+                        <button onClick={() => handleDelete('instructors', inst.id)} className="p-2 text-slate-400 hover:text-rose-400 bg-slate-900/50 hover:bg-slate-800 border border-slate-700 rounded-lg transition-all shadow-sm"><Icons.Trash /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {instructors.length === 0 && <tr><td colSpan="6" className="text-center py-12 text-slate-500 font-bold tracking-widest bg-slate-800/20">無講師排程</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    ));
+
+    const TeamWorkloadView = memo(({ team, projects, tasks, instructors, handleOpenModal, handleDelete }) => (
+      <div className="space-y-6 fade-in max-w-[1400px] mx-auto pb-24">
+        <div className="bg-slate-900/60 backdrop-blur-xl p-5 rounded-3xl shadow-lg border border-slate-800/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-4 z-30">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 text-white"><Icons.Users /></div>
+            <div>
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400 tracking-wide">團隊負荷分析</h2>
+              <p className="text-xs text-slate-500 font-bold mt-1">跨專案人力調配與工作負荷狀態一覽</p>
+            </div>
+          </div>
+          <button onClick={() => handleOpenModal('team')} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-500 shadow-lg active:scale-95 transition-all font-bold">
+            <Icons.Plus /> 新增成員
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {team.map(member => {
+            const memberProjects = projects.filter(p => p.pm === member.name);
+            const memberTasks = tasks.filter(t => t.assignee === member.name);
+            const memberInstructors = instructors.filter(i => i.name === member.name);
+
+            const pCount = memberProjects.length;
+            const tCount = memberTasks.length;
+            const iCount = memberInstructors.reduce((sum, inst) => sum + Number(inst.classCount || 1), 0);
+            const totalWork = pCount + tCount + iCount;
+            
+            const projectNames = new Set([
+              ...memberProjects.map(p => p.name.split('：')[0].split(' ')[1] || p.name.split(' ')[0]),
+              ...memberTasks.map(t => projects.find(p => p.id === t.project)?.name.split('：')[0].split(' ')[1] || projects.find(p => p.id === t.project)?.name.split(' ')[0]),
+              ...memberInstructors.map(i => projects.find(p => p.id === i.project)?.name.split('：')[0].split(' ')[1] || projects.find(p => p.id === i.project)?.name.split(' ')[0])
+            ]);
+            const activeTags = Array.from(projectNames).filter(Boolean);
+
+            return { ...member, pCount, tCount, iCount, totalWork, activeTags };
+          }).sort((a, b) => b.totalWork - a.totalWork)
+          .map(member => {
+            let dynamicWorkload = '正常';
+            let dynamicColor = 'bg-emerald-500';
+            if (member.totalWork === 0) {
+              dynamicWorkload = '閒置';
+              dynamicColor = 'bg-slate-500';
+            } else if (member.totalWork > 4) {
+              dynamicWorkload = '滿載';
+              dynamicColor = 'bg-rose-500';
+            }
+
+            return (
+              <div key={member.id} className="bg-slate-800/40 p-6 rounded-3xl border border-slate-700/50 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group flex flex-col h-full">
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${dynamicColor} opacity-80`}></div>
+                
+                <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/80 backdrop-blur-sm p-1 rounded-lg border border-slate-700 z-10">
+                  <button onClick={() => handleOpenModal('team', member)} className="p-1.5 text-slate-400 hover:text-indigo-400 rounded-md transition-colors"><Icons.Edit /></button>
+                  <button onClick={() => handleDelete('team', member.id)} className="p-1.5 text-slate-400 hover:text-rose-400 rounded-md transition-colors"><Icons.Trash /></button>
+                </div>
+
+                <div className="flex justify-between items-start mb-4 pl-3">
+                  <div className="flex gap-3 items-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-300 font-black text-xl shadow-inner shrink-0">
+                      {member.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-lg text-slate-100 leading-tight">{member.name}</h3>
+                      <p className="text-[12px] text-indigo-400 font-bold mt-1 tracking-widest">{member.role}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pl-3 mb-6 flex flex-wrap gap-2 min-h-[24px]">
+                  {member.activeTags.length > 0 ? member.activeTags.map((tag, idx) => (
+                    <span key={idx} className="bg-slate-900/50 border border-slate-700 text-slate-300 text-[10px] px-2.5 py-1 rounded-md font-bold max-w-[120px] truncate shadow-sm" title={tag}>
+                      {tag}
+                    </span>
+                  )) : (
+                    <span className="text-slate-600 text-[10px] px-1 py-1 font-bold italic">目前無專案</span>
+                  )}
+                </div>
+
+                <div className="mt-auto pl-3 space-y-3">
+                   <div className="flex justify-between items-center mb-4">
+                      <span className={`px-3 py-1 rounded-lg text-[11px] font-black tracking-widest border shadow-sm ${
+                        dynamicWorkload === '滿載' ? 'bg-rose-900/30 text-rose-400 border-rose-800/50' : 
+                        dynamicWorkload === '閒置' ? 'bg-slate-900/50 text-slate-400 border-slate-700' : 'bg-emerald-900/30 text-emerald-400 border-emerald-800/50'
+                      }`}>
+                        狀態: {dynamicWorkload} (總負荷 {member.totalWork})
+                      </span>
+                   </div>
+                  <div className="flex justify-between items-center p-3.5 bg-slate-900/50 border border-slate-700/50 rounded-xl shadow-inner">
+                    <span className="text-xs text-slate-400 font-bold tracking-widest">負責專案數</span>
+                    <span className="font-black text-slate-200 text-lg">{member.pCount}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3.5 bg-slate-900/50 border border-slate-700/50 rounded-xl shadow-inner">
+                    <span className="text-xs text-slate-400 font-bold tracking-widest">任務 / 課堂數</span>
+                    <span className="font-black text-slate-200 text-lg">{member.tCount} <span className="text-slate-600 text-sm mx-1">/</span> {member.iCount}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ));
+
+    const PmGanttView = memo(({ projects, tasks }) => {
+        const allDates = [
+            ...projects.map(p => new Date(p.startDate)),
+            ...projects.map(p => new Date(p.endDate)),
+            ...tasks.map(t => new Date(t.startDate)),
+            ...tasks.map(t => new Date(t.endDate))
+        ].filter(d => !isNaN(d.getTime()));
+
+        if (allDates.length === 0) {
+            return (
+                <div className="h-[600px] flex flex-col items-center justify-center text-slate-500 bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/80 border-dashed animate-fade-in-up">
+                    <Icons.CalendarDays className="mb-4 text-slate-600 opacity-50 w-16 h-16"/>
+                    <p className="font-black text-xl text-slate-400 tracking-wide">尚無專案或任務資料可產生甘特圖</p>
+                    <p className="text-sm mt-2 font-medium">請先至看板或專案總覽新增帶有日期的項目</p>
+                </div>
+            );
+        }
+
+        const minDate = new Date(Math.min(...allDates));
+        const maxDate = new Date(Math.max(...allDates));
+        minDate.setDate(minDate.getDate() - 7);
+        maxDate.setDate(maxDate.getDate() + 7);
+
+        const totalMs = maxDate - minDate;
+
+        const getPositionStyle = (startStr, endStr) => {
+            const s = new Date(startStr);
+            const e = new Date(endStr);
+            if (isNaN(s) || isNaN(e)) return { display: 'none' };
+            const leftPct = ((s - minDate) / totalMs) * 100;
+            const widthPct = ((e - s) / totalMs) * 100;
+            return { left: `${Math.max(0, leftPct)}%`, width: `${Math.max(0.5, widthPct)}%` };
+        };
+
+        const months = [];
+        let currentMonth = new Date(minDate);
+        currentMonth.setDate(1);
+        while (currentMonth <= maxDate) {
+            months.push(new Date(currentMonth));
+            currentMonth.setMonth(currentMonth.getMonth() + 1);
+        }
+
+        return (
+            <div className="space-y-6 h-full flex flex-col fade-in max-w-[1400px] mx-auto pb-24">
+                <div className="bg-slate-900/60 backdrop-blur-xl p-5 rounded-3xl shadow-lg border border-slate-800/80 flex items-center gap-4 sticky top-4 z-30">
+                    <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 text-white"><Icons.GanttChartSquare /></div>
+                    <div>
+                        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400 tracking-wide">專案全域甘特圖</h2>
+                        <p className="text-xs text-slate-500 font-bold mt-1">跨專案與任務的時間線概覽 (點擊可編輯)</p>
+                    </div>
+                </div>
+                
+                <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-800/80 flex-1 overflow-auto relative custom-scrollbar p-6">
+                    <div className="min-w-[1000px] relative">
+                        
+                        {/* 時間軸 Header */}
+                        <div className="flex border-b border-slate-700/80 mb-6 sticky top-0 z-30 bg-slate-900/95 backdrop-blur-xl pt-4 pb-3 rounded-t-2xl">
+                            <div className="w-64 shrink-0 flex items-end pb-1 pl-4 pr-4">
+                                <span className="text-[11px] font-black text-slate-500 tracking-widest uppercase">專案 / 任務列表</span>
+                            </div>
+                            <div className="flex-1 relative h-8">
+                                {months.map((m, i) => {
+                                    const left = ((m - minDate) / totalMs) * 100;
+                                    if (left > 100 || left < -10) return null;
+                                    return (
+                                        <div key={i} className="absolute text-[11px] font-black text-slate-400 -translate-x-1/2 flex flex-col items-center top-0" style={{ left: `${left}%` }}>
+                                            {m.getFullYear()} / {String(m.getMonth() + 1).padStart(2, '0')}
+                                            <div className="w-0.5 h-2.5 bg-slate-600 rounded-full mt-1.5"></div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="space-y-8 relative pb-10">
+                            {/* 垂直格線背景 */}
+                            <div className="absolute inset-0 pointer-events-none flex z-0">
+                                <div className="w-64 shrink-0"></div>
+                                <div className="flex-1 relative">
+                                    {months.map((m, i) => {
+                                        const left = ((m - minDate) / totalMs) * 100;
+                                        if (left > 100 || left < 0) return null;
+                                        return <div key={i} className="absolute top-0 bottom-0 border-l border-dashed border-slate-700/50" style={{ left: `${left}%` }}></div>;
+                                    })}
+                                </div>
+                            </div>
+
+                            {projects.map(project => {
+                                const projectTasks = tasks.filter(t => t.project === project.id);
+                                return (
+                                    <div key={project.id} className="relative z-10 bg-slate-800/30 rounded-2xl p-4 border border-slate-700/30 transition-colors hover:bg-slate-800/50">
+                                        <div className="flex items-center mb-4 group">
+                                            <div className="w-64 shrink-0 font-black text-[14px] text-slate-200 pr-4 flex items-center gap-3 pl-2" title={project.name}>
+                                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)] shrink-0"></div>
+                                                <span className="truncate">{project.name.split('：')[0]}</span>
+                                            </div>
+                                            <div className="flex-1 relative h-8 bg-slate-900/80 border border-slate-700 rounded-xl shadow-inner">
+                                                <div 
+                                                    className="absolute top-1 bottom-1 bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-lg shadow-md flex items-center px-3 hover:from-indigo-500 hover:to-indigo-300 transition-colors cursor-pointer border border-indigo-400/30"
+                                                    style={getPositionStyle(project.startDate, project.endDate)}
+                                                    title={`專案: ${project.name}\n${project.startDate} ~ ${project.endDate}`}
+                                                >
+                                                    <span className="text-white text-[11px] font-black truncate w-full tracking-widest">{project.progress}%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-2 mt-4 relative">
+                                            {projectTasks.map(task => (
+                                                <div key={task.id} className="flex items-center group/task relative">
+                                                    {/* 連接線 */}
+                                                    <div className="absolute left-3.5 -top-3 w-px h-7 bg-slate-600"></div>
+                                                    <div className="absolute left-3.5 top-1/2 w-5 h-px bg-slate-600"></div>
+                                                    
+                                                    <div className="w-64 shrink-0 text-[12px] font-bold text-slate-400 pl-10 pr-4 flex justify-between items-center">
+                                                        <span className="truncate" title={task.title}>{task.title}</span>
+                                                    </div>
+                                                    
+                                                    <div className="flex-1 relative h-6">
+                                                        <div 
+                                                            className="absolute top-0.5 bottom-0.5 bg-gradient-to-r from-sky-600 to-blue-500 rounded-md shadow-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer flex items-center px-2 border border-sky-400/30"
+                                                            style={getPositionStyle(task.startDate, task.endDate)}
+                                                            title={`任務: ${task.title}\n${task.startDate} ~ ${task.endDate}\n負責人: ${task.assignee}`}
+                                                        >
+                                                            <span className="text-white/90 text-[10px] font-bold truncate hidden md:inline-block drop-shadow-md">{task.assignee}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    });
+
 
     const App = () => {
           // 預設為數據儀表板
@@ -1055,6 +1681,16 @@
           const [syncStatus, setSyncStatus] = useState('連線中...');
           const [forceRefresh, setForceRefresh] = useState(0); 
 
+          // 權限控制與密碼設定
+          const [isAdmin, setIsAdmin] = useState(false);
+          const [adminPassword, setAdminPassword] = useState('admin');
+          const [showAuthModal, setShowAuthModal] = useState(false);
+          const [showPasswordModal, setShowPasswordModal] = useState(false);
+          const [authInput, setAuthInput] = useState('');
+          const [newPasswordInput, setNewPasswordInput] = useState('');
+          const [authError, setAuthError] = useState(false);
+
+          // HR State
           const [personnel, setPersonnel] = useState({});
           const [categoryGroups, setCategoryGroups] = useState(DEFAULT_CATEGORY_GROUPS);
           const [taskTypes, setTaskTypes] = useState(DEFAULT_TASK_TYPES);
@@ -1062,17 +1698,28 @@
           const [masterCourses, setMasterCourses] = useState([]);
           const [monthlyData, setMonthlyData] = useState(() => Array(12).fill([{ name: '月月繪', type: 'monthlyActivity', students: 0, batch: '常駐' }]));
           const [manualStats, setManualStats] = useState({});
-
           const [courseMappings, setCourseMappings] = useState({
               '透視': 'regular', '構成': 'reg_comp', '色彩': 'reg_color',
               '線條訓練營': 'bootcamp', '色彩訓練營': 'camp_color', '速寫團練': 'sketch', '月月繪': 'lec_monthly'
           });
 
-          // Modals Control
+          // PM State
+          const [pmProjects, setPmProjects] = useState(initialProjects);
+          const [pmTasks, setPmTasks] = useState(initialTasks);
+          const [pmInstructors, setPmInstructors] = useState(initialInstructors);
+          const [pmTeam, setPmTeam] = useState(initialTeam);
+          const [kanbanCols, setKanbanCols] = useState(INITIAL_KANBAN_COLUMNS);
+
+          // HR Modals Control
           const [showMappingModal, setShowMappingModal] = useState(false);
           const [showCourseModal, setShowCourseModal] = useState(false);
           const [showCategoryModal, setShowCategoryModal] = useState(false);
           const [showTaskTypeModal, setShowTaskTypeModal] = useState(false);
+          const [wsShowBatchModal, setWsShowBatchModal] = useState(false);
+
+          // PM Modals Control
+          const [pmModalConfig, setPmModalConfig] = useState({ isOpen: false, type: null, isEdit: false, data: null });
+          const [pmFormData, setPmFormData] = useState({});
           
           // Forms state
           const [newMapping, setNewMapping] = useState({ courseName: '', categoryId: '' });
@@ -1080,9 +1727,7 @@
           const [newCatForm, setNewCatForm] = useState({ groupIdx: 0, label: '', id: '' });
           const [newTaskForm, setNewTaskForm] = useState({ id: '', label: '', color: 'bg-indigo-600 text-indigo-50', targetCategory: '' });
           const [newCourse, setNewCourse] = useState({ name: '透視', type: 'regular', batch: '', students: 0, startDate: '', duration: 70, endDate: '' });
-
           const [wsSearchTerm, setWsSearchTerm] = useState("");
-          const [wsShowBatchModal, setWsShowBatchModal] = useState(false);
           const [wsBatchForm, setWsBatchForm] = useState({ personId: '', startDate: '', endDate: '', type: 'persp_group', context: '' });
 
           const [collapsedMonths, setCollapsedMonths] = useState({});
@@ -1110,6 +1755,8 @@
                       if (data && data.length > 0) {
                           const state = {};
                           data.forEach(row => { state[row.key] = row.value; });
+                          
+                          // Load HR Data
                           if (state.categoryGroups) setCategoryGroups(state.categoryGroups);
                           if (state.taskTypes) setTaskTypes(state.taskTypes);
                           if (state.personnel) {
@@ -1125,6 +1772,14 @@
                           if (state.manualStats) { try { setManualStats(typeof state.manualStats === 'string' ? JSON.parse(state.manualStats) : state.manualStats); } catch(e) {} }
                           if (state.monthlyData) { try { setMonthlyData(typeof state.monthlyData === 'string' ? JSON.parse(state.monthlyData) : state.monthlyData); } catch(e) {} }
                           if (state.courseMappings) { try { setCourseMappings(typeof state.courseMappings === 'string' ? JSON.parse(state.courseMappings) : state.courseMappings); } catch(e) {} }
+                          if (state.adminPassword) setAdminPassword(state.adminPassword);
+
+                          // Load PM Data
+                          if (state.pmProjects) setPmProjects(state.pmProjects);
+                          if (state.pmTasks) setPmTasks(state.pmTasks);
+                          if (state.pmInstructors) setPmInstructors(state.pmInstructors);
+                          if (state.pmTeam) setPmTeam(state.pmTeam);
+                          if (state.kanbanCols) setKanbanCols(state.kanbanCols);
                       }
                       setSyncStatus('✅ 已同步');
                   } catch (err) {
@@ -1139,6 +1794,7 @@
                   .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload) => {
                       const { key, value } = payload.new;
                       if (!key) return;
+                      // HR Sync
                       if (key === 'categoryGroups') setCategoryGroups(value);
                       else if (key === 'taskTypes') setTaskTypes(value);
                       else if (key === 'personnel') setPersonnel(value);
@@ -1147,6 +1803,13 @@
                       else if (key === 'manualStats') { try { setManualStats(typeof value === 'string' ? JSON.parse(value) : value); } catch(e){} }
                       else if (key === 'monthlyData') { try { setMonthlyData(typeof value === 'string' ? JSON.parse(value) : value); } catch(e){} }
                       else if (key === 'courseMappings') { try { setCourseMappings(typeof value === 'string' ? JSON.parse(value) : value); } catch(e){} }
+                      else if (key === 'adminPassword') setAdminPassword(value);
+                      // PM Sync
+                      else if (key === 'pmProjects') setPmProjects(value);
+                      else if (key === 'pmTasks') setPmTasks(value);
+                      else if (key === 'pmInstructors') setPmInstructors(value);
+                      else if (key === 'pmTeam') setPmTeam(value);
+                      else if (key === 'kanbanCols') setKanbanCols(value);
                   })
                   .subscribe();
               return () => { supabase.removeChannel(channel); };
@@ -1164,7 +1827,9 @@
               }
           }, []);
 
-          // --- Logic Hooks ---
+          // ==============================
+          // HR Logic Functions
+          // ==============================
           const schedule = useMemo(() => {
               const newSchedule = Array.from({ length: 12 }, (_, i) => ({
                   month: `${i + 1}月`,
@@ -1215,7 +1880,6 @@
           const calculateEndDate = (startStr, days) => { if (!startStr || !days) return ''; const d = new Date(startStr); d.setDate(d.getDate() + parseInt(days) - 1); return d.toISOString().split('T')[0]; };
           const calculateDuration = (startStr, endStr) => { if (!startStr || !endStr) return 0; const s = new Date(startStr), e = new Date(endStr); if (e < s) return 0; return Math.ceil(Math.abs(e - s) / (86400000)) + 1; };
 
-          // Handlers for Data changes
           const movePersonToCategory = useCallback((empId, targetCatId) => {
               if (!targetCatId) return;
               setPersonnel(prevPersonnel => {
@@ -1289,10 +1953,113 @@
               saveData('personnel', newPersonnelData);
           }, [saveData]);
 
-          const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes, courseMappings }, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
+          const handleSaveCategories = (newGroups) => { setCategoryGroups(newGroups); saveData('categoryGroups', newGroups); setShowCategoryModal(false); };
+          const handleSaveTaskTypes = (newTypes) => { setTaskTypes(newTypes); saveData('taskTypes', newTypes); setShowTaskTypeModal(false); };
+
+
+          // ==============================
+          // PM Logic Functions
+          // ==============================
+          const handleOpenPmModal = (type, item = null) => {
+              if(!isAdmin && type !== 'projectDetails') return; // Readonly protection for non-admin except details
+              setPmModalConfig({ isOpen: true, type, isEdit: !!item, data: item });
+              if (type !== 'projectDetails') {
+                  let initData = item ? { ...item } : {};
+                  if (item && item.tags && Array.isArray(item.tags)) initData.tags = item.tags.join(', ');
+                  if (['projects', 'tasks'].includes(type)) initData.docLinks = initData.docLinks || [];
+                  if (type === 'instructors') {
+                      initData.classCount = initData.classCount || 1;
+                      initData.classNames = Array.isArray(initData.classNames) ? [...initData.classNames] : (initData.classNames ? [initData.classNames] : ['']);
+                  }
+                  setPmFormData(initData);
+              }
+          };
+
+          const handleClosePmModal = () => setPmModalConfig({ isOpen: false, type: null, isEdit: false, data: null });
+
+          const handlePmInputChange = (e) => {
+              const { name, value } = e.target;
+              setPmFormData(prev => ({ ...prev, [name]: value }));
+          };
+
+          const handlePmDocLinkChange = (index, field, value) => {
+              const newLinks = [...pmFormData.docLinks];
+              newLinks[index][field] = value;
+              setPmFormData(prev => ({ ...prev, docLinks: newLinks }));
+          };
+
+          const addPmDocLink = () => setPmFormData(prev => ({ ...prev, docLinks: [...(prev.docLinks || []), { title: '', url: '' }] }));
+          const removePmDocLink = (index) => setPmFormData(prev => ({ ...prev, docLinks: pmFormData.docLinks.filter((_, i) => i !== index) }));
+
+          const handlePmSubmit = (e) => {
+              e.preventDefault();
+              const isEdit = pmModalConfig.isEdit;
+              const id = isEdit ? pmFormData.id : 'NEW-' + Math.random().toString(36).substr(2, 6);
+              
+              let cleanFormData = { ...pmFormData };
+              if (cleanFormData.docLinks) cleanFormData.docLinks = cleanFormData.docLinks.filter(l => l.title.trim() !== '' || l.url.trim() !== '');
+
+              if (pmModalConfig.type === 'projects') {
+                  const updated = isEdit ? pmProjects.map(p => p.id === id ? cleanFormData : p) : [...pmProjects, { ...cleanFormData, id, status: '評估中', progress: 0 }];
+                  setPmProjects(updated); saveData('pmProjects', updated);
+              } else if (pmModalConfig.type === 'tasks') {
+                  cleanFormData.status = cleanFormData.status || kanbanCols[0];
+                  if (typeof cleanFormData.tags === 'string') cleanFormData.tags = cleanFormData.tags.split(',').map(t => t.trim()).filter(t => t);
+                  const updated = isEdit ? pmTasks.map(t => t.id === id ? cleanFormData : t) : [...pmTasks, { ...cleanFormData, id }];
+                  setPmTasks(updated); saveData('pmTasks', updated);
+              } else if (pmModalConfig.type === 'instructors') {
+                  let finalInstData = { ...pmFormData };
+                  if (finalInstData.classCount) finalInstData.classNames = (finalInstData.classNames || []).slice(0, parseInt(finalInstData.classCount));
+                  const updated = isEdit ? pmInstructors.map(i => i.id === id ? finalInstData : i) : [...pmInstructors, { ...finalInstData, id }];
+                  setPmInstructors(updated); saveData('pmInstructors', updated);
+              } else if (pmModalConfig.type === 'team') {
+                  const updated = isEdit ? pmTeam.map(m => m.id === id ? pmFormData : m) : [...pmTeam, { ...pmFormData, id }];
+                  setPmTeam(updated); saveData('pmTeam', updated);
+              }
+              handleClosePmModal();
+          };
+
+          const handlePmDelete = (type, id) => {
+              setConfirmDialog({ show: true, message: "確定要刪除這筆紀錄嗎？此動作無法復原。", onConfirm: () => {
+                  if (type === 'projects') { const upd = pmProjects.filter(p => p.id !== id); setPmProjects(upd); saveData('pmProjects', upd); }
+                  if (type === 'tasks') { const upd = pmTasks.filter(t => t.id !== id); setPmTasks(upd); saveData('pmTasks', upd); }
+                  if (type === 'instructors') { const upd = pmInstructors.filter(i => i.id !== id); setPmInstructors(upd); saveData('pmInstructors', upd); }
+                  if (type === 'team') { const upd = pmTeam.filter(m => m.id !== id); setPmTeam(upd); saveData('pmTeam', upd); }
+              }});
+          };
+
+          const moveArrayElement = (array, index, direction) => {
+              const newArr = [...array];
+              if (direction === -1 && index > 0) [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
+              else if (direction === 1 && index < newArr.length - 1) [newArr[index + 1], newArr[index]] = [newArr[index], newArr[index + 1]];
+              return newArr;
+          };
+          const handleMoveProject = (index, dir) => { const upd = moveArrayElement(pmProjects, index, dir); setPmProjects(upd); saveData('pmProjects', upd); };
+          const handleMoveColumn = (index, dir) => { const upd = moveArrayElement(kanbanCols, index, dir); setKanbanCols(upd); saveData('kanbanCols', upd); };
+          const handleMoveTask = (task, dir) => {
+              const siblingTasks = pmTasks.filter(t => t.project === task.project && t.status === task.status);
+              const siblingIndex = siblingTasks.findIndex(t => t.id === task.id);
+              let targetId = null;
+              if (dir === -1 && siblingIndex > 0) targetId = siblingTasks[siblingIndex - 1].id;
+              else if (dir === 1 && siblingIndex < siblingTasks.length - 1) targetId = siblingTasks[siblingIndex + 1].id;
+              if (targetId) {
+                  const newTasks = [...pmTasks];
+                  const idx1 = newTasks.findIndex(t => t.id === task.id);
+                  const idx2 = newTasks.findIndex(t => t.id === targetId);
+                  [newTasks[idx1], newTasks[idx2]] = [newTasks[idx2], newTasks[idx1]];
+                  setPmTasks(newTasks); saveData('pmTasks', newTasks);
+              }
+          };
+
+
+          // ==============================
+          // System Operations
+          // ==============================
+          const handleExport = () => { const data = { personnel, masterCourses, attendanceData, monthlyData: schedule.map(m => ({ month_index: parseInt(m.month), students: m.monthly[0].students })), settings: { categoryGroups, taskTypes, courseMappings }, pmProjects, pmTasks, pmInstructors, pmTeam, kanbanCols, timestamp: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `erp_backup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
           const handleImportClick = () => { fileInputRef.current.click(); }
           const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (event) => { try { const imported = JSON.parse(event.target.result); 
                 setConfirmDialog({ show: true, message: "確認要匯入並覆蓋目前所有的資料嗎？", onConfirm: async () => {
+                     // Import logic
                      if (imported.settings) { 
                          if (imported.settings.categoryGroups) { setCategoryGroups(imported.settings.categoryGroups); await saveData('categoryGroups', imported.settings.categoryGroups); } 
                          if (imported.settings.taskTypes) { setTaskTypes(imported.settings.taskTypes); await saveData('taskTypes', imported.settings.taskTypes); } 
@@ -1303,13 +2070,20 @@
                      if (imported.attendanceData) { setAttendanceData(imported.attendanceData); await saveData('attendanceData', imported.attendanceData); } 
                      if (imported.monthlyData) { await saveData('monthlyData', imported.monthlyData); } 
                      if (imported.manualStats) { setManualStats(imported.manualStats); await saveData('manualStats', imported.manualStats); }
+                     if (imported.adminPassword) { setAdminPassword(imported.adminPassword); await saveData('adminPassword', imported.adminPassword); }
+                     
+                     // PM Import
+                     if (imported.pmProjects) { setPmProjects(imported.pmProjects); await saveData('pmProjects', imported.pmProjects); }
+                     if (imported.pmTasks) { setPmTasks(imported.pmTasks); await saveData('pmTasks', imported.pmTasks); }
+                     if (imported.pmInstructors) { setPmInstructors(imported.pmInstructors); await saveData('pmInstructors', imported.pmInstructors); }
+                     if (imported.pmTeam) { setPmTeam(imported.pmTeam); await saveData('pmTeam', imported.pmTeam); }
+                     if (imported.kanbanCols) { setKanbanCols(imported.kanbanCols); await saveData('kanbanCols', imported.kanbanCols); }
+
                      setSyncStatus('✅ 匯入完成'); 
                      setForceRefresh(p=>p+1);
                 }});
           } catch(e){} }; reader.readAsText(file); e.target.value=''; };
           
-          const handleSaveCategories = (newGroups) => { setCategoryGroups(newGroups); saveData('categoryGroups', newGroups); setShowCategoryModal(false); };
-          const handleSaveTaskTypes = (newTypes) => { setTaskTypes(newTypes); saveData('taskTypes', newTypes); setShowTaskTypeModal(false); };
 
           // Calculated Stats
           const stats = useMemo(() => {
@@ -1332,31 +2106,81 @@
 
           return (
              <div className="flex min-h-screen bg-slate-950 text-slate-200 selection:bg-indigo-500/30 font-sans">
-                <nav className="fixed md:relative bottom-0 w-full md:w-[260px] bg-slate-900/80 backdrop-blur-3xl border-t md:border-r border-slate-800/80 z-50 flex md:flex-col justify-around md:justify-start p-3 md:p-6 md:space-y-4 shadow-[0_0_40px_rgba(0,0,0,0.5)] md:shadow-none">
-                    <div className="hidden md:flex items-center gap-4 px-2 mb-8">
-                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-500/30">M</div>
-                        <span className="font-black text-2xl text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400 tracking-tight">人力儀表板</span>
+                {/* 側邊導航列 */}
+                <nav className="fixed md:relative bottom-0 w-full md:w-[260px] bg-slate-900/80 backdrop-blur-3xl border-t md:border-r border-slate-800/80 z-50 flex md:flex-col justify-around md:justify-start p-3 md:p-5 shadow-[0_0_40px_rgba(0,0,0,0.5)] md:shadow-none overflow-y-auto custom-scrollbar">
+                    <div className="hidden md:flex items-center gap-4 px-2 mb-6 mt-2">
+                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-500/30">E</div>
+                        <div className="flex flex-col">
+                            <span className="font-black text-xl text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400 tracking-tight leading-none">ERP Console</span>
+                            <span className="text-[10px] text-indigo-400 font-bold mt-0.5 tracking-widest uppercase">統合管理系統</span>
+                        </div>
                     </div>
                     
-                    {[
-                        { id: 'dashboard', icon: <Icons.Dashboard />, label: '數據儀表板' },
-                        { id: 'forecast', icon: <Icons.BarChart />, label: '預測表' },
-                        { id: 'timeline', icon: <Icons.Calendar />, label: '課程時間軸' },
-                        { id: 'database', icon: <Icons.Database />, label: '系統數據庫' },
-                    ].map(item => (
-                        <button 
-                            key={item.id}
-                            onClick={() => setCurrentView(item.id)} 
-                            className={`nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-2xl font-bold transition-all duration-300 group ${currentView === item.id ? 'bg-gradient-to-r from-indigo-600/20 to-indigo-600/5 text-indigo-300 border border-indigo-500/20 shadow-sm' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent'}`}
-                        >
-                            <span className={`${currentView === item.id ? 'text-indigo-400 scale-110 drop-shadow-md' : 'text-slate-500 group-hover:text-slate-300 group-hover:scale-110'} transition-all duration-300`}>{item.icon}</span> 
-                            <span className="text-[10px] md:text-sm tracking-wide">{item.label}</span>
-                        </button>
-                    ))}
+                    <div className="space-y-6 flex-1">
+                        {/* HR Section */}
+                        <div className="hidden md:block">
+                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2">人力資源管理</h4>
+                            <div className="space-y-1">
+                                {[
+                                    { id: 'dashboard', icon: <Icons.Dashboard size={18} />, label: '數據儀表板' },
+                                    { id: 'forecast', icon: <Icons.BarChart size={18} />, label: '人力預測表' },
+                                    { id: 'timeline', icon: <Icons.Calendar size={18} />, label: '開課時間軸' },
+                                    { id: 'database', icon: <Icons.Database size={18} />, label: '系統數據庫' },
+                                ].map(item => (
+                                    <button key={item.id} onClick={() => setCurrentView(item.id)} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 group ${currentView === item.id ? 'bg-indigo-900/30 text-indigo-300 shadow-sm' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`}>
+                                        <span className={`${currentView === item.id ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'}`}>{item.icon}</span> 
+                                        <span className="text-sm tracking-wide">{item.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* PM Section */}
+                        <div className="hidden md:block">
+                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 mb-2">專案進度管理</h4>
+                            <div className="space-y-1">
+                                {[
+                                    { id: 'pm_projects', icon: <Icons.Briefcase size={18} />, label: '專案總覽' },
+                                    { id: 'pm_tasks', icon: <Icons.KanbanSquare size={18} />, label: '任務看板' },
+                                    { id: 'pm_instructors', icon: <Icons.CalendarDays size={18} />, label: '講師排程' },
+                                    { id: 'pm_team', icon: <Icons.Users size={18} />, label: '團隊負荷' },
+                                    { id: 'pm_gantt', icon: <Icons.GanttChartSquare size={18} />, label: '專案甘特圖' },
+                                ].map(item => (
+                                    <button key={item.id} onClick={() => setCurrentView(item.id)} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 group ${currentView === item.id ? 'bg-amber-900/30 text-amber-300 shadow-sm' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`}>
+                                        <span className={`${currentView === item.id ? 'text-amber-400' : 'text-slate-500 group-hover:text-slate-300'}`}>{item.icon}</span> 
+                                        <span className="text-sm tracking-wide">{item.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Mobile merged view (simplified) */}
+                        <div className="md:hidden flex w-full justify-around">
+                             {[
+                                { id: 'dashboard', icon: <Icons.Dashboard size={20} />, label: '儀表板' },
+                                { id: 'database', icon: <Icons.Database size={20} />, label: '數據庫' },
+                                { id: 'pm_projects', icon: <Icons.Briefcase size={20} />, label: '專案' },
+                                { id: 'pm_tasks', icon: <Icons.KanbanSquare size={20} />, label: '任務' },
+                            ].map(item => (
+                                <button key={item.id} onClick={() => setCurrentView(item.id)} className={`flex flex-col items-center gap-1 p-2 rounded-xl font-bold transition-all duration-300 ${currentView === item.id ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                    {item.icon}
+                                    <span className="text-[10px] tracking-wide">{item.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     
+                    {/* Settings & Auth */}
                     <div className="hidden md:block mt-auto pt-6 border-t border-slate-800/60 space-y-3">
-                        <div className="flex items-center gap-2 text-[11px] font-black text-slate-500 px-4 uppercase tracking-widest"><Icons.Cloud /> <span>{syncStatus}</span></div>
-                        <button onClick={() => setForceRefresh(p=>p+1)} className="w-full text-xs font-bold bg-slate-800/50 hover:bg-slate-700/80 text-slate-300 py-3 rounded-xl text-center transition-colors border border-slate-700/50 hover:border-slate-600 active:scale-95 shadow-sm">重新整理資料</button>
+                        <button onClick={() => isAdmin ? setIsAdmin(false) : setShowAuthModal(true)} className={`w-full flex items-center justify-center gap-2 text-xs font-bold py-3 rounded-xl text-center transition-colors border shadow-sm ${isAdmin ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/30 hover:bg-indigo-900/60' : 'bg-slate-800/50 text-slate-400 border-slate-700/50 hover:bg-slate-700'}`}>
+                            {isAdmin ? <><Icons.Unlock /> 管理員已解鎖</> : <><Icons.Lock /> 訪客模式 (僅檢視)</>}
+                        </button>
+                        {isAdmin && (
+                            <button onClick={() => setShowPasswordModal(true)} className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-slate-800/50 hover:bg-slate-700/80 text-slate-300 py-2.5 rounded-xl transition-colors border border-slate-700/50 shadow-sm">
+                                <Icons.Key /> 變更密碼
+                            </button>
+                        )}
+                        <div className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-500 px-4 uppercase tracking-widest mt-4"><Icons.Cloud /> <span>{syncStatus}</span></div>
                         <div className="grid grid-cols-2 gap-3 mt-2">
                             <button onClick={handleExport} className="flex items-center justify-center gap-1.5 text-xs font-bold bg-slate-800/50 hover:bg-indigo-900/40 text-slate-300 hover:text-indigo-300 py-3 rounded-xl transition-colors border border-slate-700/50 hover:border-indigo-500/30 active:scale-95 shadow-sm" title="匯出備份"><Icons.Download /> 匯出</button>
                             <button onClick={handleImportClick} className="flex items-center justify-center gap-1.5 text-xs font-bold bg-slate-800/50 hover:bg-emerald-900/40 text-slate-300 hover:text-emerald-300 py-3 rounded-xl transition-colors border border-slate-700/50 hover:border-emerald-500/30 active:scale-95 shadow-sm" title="匯入還原"><Icons.Upload /> 匯入</button>
@@ -1365,135 +2189,455 @@
                     </div>
                 </nav>
 
-                <main className="flex-1 p-4 md:p-8 md:px-12 pb-24 md:pb-12 overflow-y-auto h-screen relative">
+                <main className="flex-1 p-4 md:p-8 md:px-10 pb-24 md:pb-8 overflow-y-auto h-screen relative">
                     <div className="absolute top-0 left-0 w-full h-[600px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950 pointer-events-none -z-10"></div>
 
+                    {/* HR Views */}
                     {currentView === 'dashboard' && <DashboardView masterCourses={masterCourses} courseMappings={courseMappings} personnel={personnel} calculateManpower={calculateManpower} getHealthStatus={getHealthStatus} />}
-                    {currentView === 'forecast' && <ForecastView stats={stats} schedule={schedule} courseMappings={courseMappings} personnel={personnel} calculateManpower={calculateManpower} getHealthStatus={getHealthStatus} monthlyData={monthlyData} handleMonthlyChange={handleMonthlyChange} collapsedMonths={collapsedMonths} setCollapsedMonths={setCollapsedMonths} categories={categories} />}
+                    {currentView === 'forecast' && <ForecastView stats={stats} schedule={schedule} courseMappings={courseMappings} personnel={personnel} calculateManpower={calculateManpower} getHealthStatus={getHealthStatus} monthlyData={monthlyData} handleMonthlyChange={handleMonthlyChange} collapsedMonths={collapsedMonths} setCollapsedMonths={setCollapsedMonths} categories={categories} isAdmin={isAdmin} />}
                     {currentView === 'timeline' && <TimelineView masterCourses={masterCourses} />}
                     {currentView === 'database' && <DatabaseView 
                         masterCourses={masterCourses} handleUpdateCourse={handleUpdateCourse} handleDeleteCourse={handleDeleteCourse} setShowCourseModal={setShowCourseModal} setShowMappingModal={setShowMappingModal}
                         personnel={personnel} categoryGroups={categoryGroups} setShowCategoryModal={setShowCategoryModal} onUpdatePersonnel={handleUpdatePersonnelState}
-                        taskTypes={taskTypes} setShowTaskTypeModal={setShowTaskTypeModal} attendanceData={attendanceData} updateAttendance={updateAttendance} batchUpdateAttendance={batchUpdateAttendance} wsSearchTerm={wsSearchTerm} setWsSearchTerm={setWsSearchTerm} dailyStats={dailyStats} wsShowBatchModal={wsShowBatchModal} setWsShowBatchModal={setWsShowBatchModal} wsBatchForm={wsBatchForm} setWsBatchForm={setWsBatchForm}
+                        taskTypes={taskTypes} setShowTaskTypeModal={setShowTaskTypeModal} attendanceData={attendanceData} updateAttendance={updateAttendance} batchUpdateAttendance={batchUpdateAttendance} wsSearchTerm={wsSearchTerm} setWsSearchTerm={setWsSearchTerm} dailyStats={dailyStats} wsShowBatchModal={wsShowBatchModal} setWsShowBatchModal={setWsShowBatchModal} wsBatchForm={wsBatchForm} setWsBatchForm={setWsBatchForm} isAdmin={isAdmin}
                     />}
+
+                    {/* PM Views */}
+                    {currentView === 'pm_projects' && <PmProjectsView projects={pmProjects} tasks={pmTasks} kanbanCols={kanbanCols} handleOpenModal={handleOpenPmModal} handleDelete={handlePmDelete} moveProject={handleMoveProject} />}
+                    {currentView === 'pm_tasks' && <TasksKanbanView projects={pmProjects} tasks={pmTasks} kanbanCols={kanbanCols} handleOpenModal={handleOpenPmModal} handleDelete={handlePmDelete} moveProject={handleMoveProject} moveColumn={handleMoveColumn} moveTask={handleMoveTask} />}
+                    {currentView === 'pm_instructors' && <InstructorsView instructors={pmInstructors} projects={pmProjects} handleOpenModal={handleOpenPmModal} handleDelete={handlePmDelete} />}
+                    {currentView === 'pm_team' && <TeamWorkloadView team={pmTeam} projects={pmProjects} tasks={pmTasks} instructors={pmInstructors} handleOpenModal={handleOpenPmModal} handleDelete={handlePmDelete} />}
+                    {currentView === 'pm_gantt' && <PmGanttView projects={pmProjects} tasks={pmTasks} />}
                 </main>
 
-            {/* General Confirm Modal */}
-            {confirmDialog.show && (
-                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl p-8 w-full max-w-sm shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border border-slate-700/50">
-                        <h3 className="font-black text-xl text-slate-100 mb-3 tracking-wide">確認操作</h3>
-                        <p className="text-slate-400 text-sm mb-8 font-medium">{confirmDialog.message}</p>
-                        <div className="flex gap-4"><button onClick={() => setConfirmDialog({ ...confirmDialog, show: false })} className="flex-1 py-3 rounded-xl font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all">取消</button><button onClick={() => { if(confirmDialog.onConfirm) confirmDialog.onConfirm(); setConfirmDialog({ ...confirmDialog, show: false }); }} className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/40 transition-all active:scale-95">確認</button></div>
-                    </div>
-                </div>
-            )}
-
-            {/* 新增/連動 Mapping Modal */}
-            {showMappingModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-md p-8 border border-slate-700/50">
-                        <div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-black text-slate-100 tracking-wide">人力連動設定</h3><button onClick={() => setShowMappingModal(false)} className="text-slate-400 hover:text-slate-200 transition-colors bg-slate-800/50 p-2 rounded-full"><Icons.X /></button></div>
-                        <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed">設定課程名稱對應到人員名單中的哪一個分類，系統才能正確試算該課程的一線人力是否充足。</p>
-                        <div className="space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar pr-3 mb-6">
-                            {Object.entries(courseMappings).map(([cName, catId]) => (
-                                <div key={cName} className="flex justify-between items-center bg-slate-800/50 p-3.5 rounded-2xl border border-slate-700/50 shadow-sm"><span className="font-black text-slate-200 text-sm tracking-wide">{cName}</span><div className="flex items-center gap-3"><span className="text-xs font-bold text-emerald-400 bg-emerald-900/20 px-3 py-1 rounded-lg border border-emerald-500/20 shadow-inner">➔ {categories.find(c=>c.id===catId)?.label || catId}</span><button onClick={() => { const newMap = {...courseMappings}; delete newMap[cName]; setCourseMappings(newMap); saveData('courseMappings', newMap); }} className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 p-2 rounded-lg transition-colors"><Icons.Trash /></button></div></div>
-                            ))}
-                        </div>
-                        <div className="bg-slate-800/30 p-5 rounded-2xl border border-slate-700/50">
-                            <h4 className="font-black text-slate-300 text-sm mb-4">新增連動規則</h4>
-                            <div className="space-y-4">
-                                <input value={newMapping.courseName} onChange={e=>setNewMapping({...newMapping, courseName: e.target.value})} placeholder="輸入課程名稱 (如: 新手營)" className="w-full bg-slate-900/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 transition-all placeholder-slate-500" />
-                                <select value={newMapping.categoryId} onChange={e=>setNewMapping({...newMapping, categoryId: e.target.value})} className="w-full bg-slate-900/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 transition-all cursor-pointer">
-                                    <option value="">-- 選擇對應的人員分類 --</option>
-                                    {categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                                </select>
-                                <button onClick={() => { if(!newMapping.courseName || !newMapping.categoryId) return; const newMap = {...courseMappings, [newMapping.courseName]: newMapping.categoryId}; setCourseMappings(newMap); saveData('courseMappings', newMap); setNewMapping({ courseName: '', categoryId: '' }); }} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-500 shadow-lg transition-all active:scale-95">新增連動</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 新增課程 Modal */}
-            {showCourseModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-xl p-8 border border-slate-700/50">
-                        <div className="flex justify-between items-center mb-8"><h3 className="text-2xl font-black text-slate-100 tracking-wide">新增課程計畫</h3><button onClick={() => setShowCourseModal(false)} className="text-slate-400 hover:text-slate-200 bg-slate-800/50 p-2 rounded-full transition-colors"><Icons.X /></button></div>
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-5">
-                                <div><label className="block text-xs font-bold text-slate-400 mb-2 tracking-widest uppercase">課程名稱</label><input type="text" list="course-presets" value={newCourse.name} onChange={e => { const val = e.target.value; const sel = COURSE_TYPES.find(c => c.label === val); if (sel) { setNewCourse({...newCourse, name: val, type: sel.value, duration: sel.days, endDate: calculateEndDate(newCourse.startDate, sel.days)}); } else { setNewCourse({...newCourse, name: val, type: 'custom'}); } }} className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 placeholder-slate-500" placeholder="選擇或手動輸入..." /><datalist id="course-presets">{COURSE_TYPES.map(c => <option key={c.label} value={c.label} />)}</datalist></div>
-                                <div><label className="block text-xs font-bold text-slate-400 mb-2 tracking-widest uppercase">期數</label><input type="text" value={newCourse.batch} onChange={e => setNewCourse({...newCourse, batch:e.target.value})} className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 placeholder-slate-500" placeholder="如: S1" /></div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-5">
-                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-400 mb-2 tracking-widest uppercase">開始日期</label><input type="date" value={newCourse.startDate} onChange={e => setNewCourse({...newCourse, startDate:e.target.value, endDate: calculateEndDate(e.target.value, newCourse.duration)})} className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 cursor-pointer" /></div>
-                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-400 mb-2 tracking-widest uppercase">天數</label><input type="number" value={newCourse.duration} onChange={e => setNewCourse({...newCourse, duration:e.target.value, endDate: calculateEndDate(newCourse.startDate, e.target.value)})} className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500" /></div>
-                                <div className="col-span-1"><label className="block text-xs font-bold text-slate-500 mb-2 tracking-widest uppercase">結束日期</label><input type="date" value={newCourse.endDate} readOnly className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 text-sm font-bold text-slate-500 outline-none cursor-not-allowed" /></div>
-                            </div>
-                            <div><label className="block text-xs font-bold text-slate-400 mb-2 tracking-widest uppercase">預估人數</label><input type="number" value={newCourse.students} onChange={e => setNewCourse({...newCourse, students:parseInt(e.target.value)||0})} className="w-full bg-slate-800/80 border border-slate-600 rounded-xl p-3 text-lg font-black text-indigo-400 outline-none focus:border-indigo-500 text-center tracking-widest" placeholder="0" /></div>
-                            {errorMsg && <div className="text-rose-400 text-sm font-bold bg-rose-950/50 border border-rose-900/50 p-3 rounded-xl flex items-center justify-center gap-2"><span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>{errorMsg}</div>}
-                            <div className="pt-6 flex gap-4"><button onClick={() => setShowCourseModal(false)} className="flex-1 py-3.5 rounded-xl font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all">取消</button><button onClick={handleAddCourse} className="flex-1 py-3.5 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg active:scale-95">確認新增</button></div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            {/* 分類管理 Modal */}
-            {showCategoryModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-xl p-8 border border-slate-700/50 max-h-[85vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6 shrink-0"><h3 className="text-2xl font-black text-slate-100 tracking-wide">管理人員分類</h3><button onClick={() => setShowCategoryModal(false)} className="text-slate-400 hover:text-slate-200 bg-slate-800/50 p-2 rounded-full transition-colors"><Icons.X /></button></div>
-                        <div className="space-y-8 overflow-y-auto custom-scrollbar pr-4 flex-1">
-                            <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50">
-                                <h4 className="font-black text-slate-200 text-sm mb-4">新增大分類 (Group)</h4>
-                                <div className="flex gap-3"><input value={newGroupForm} onChange={e=>setNewGroupForm(e.target.value)} placeholder="分類名稱 (如: 實習)" className="flex-1 bg-slate-900/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 transition-all" /><button onClick={() => { if(!newGroupForm) return; const newGroups = [...categoryGroups, { name: newGroupForm, items: [] }]; handleSaveCategories(newGroups); setNewGroupForm(''); }} className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-500 transition-all active:scale-95 shadow-md">新增</button></div>
-                            </div>
-                            <div className="space-y-6">
-                            {(categoryGroups||[]).map((group, idx) => (
-                                <div key={idx} className="border-b border-slate-800/80 pb-6">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h4 className="font-black text-lg text-indigo-300 tracking-wide flex items-center gap-2"><span className="w-1.5 h-5 bg-indigo-500 rounded-full"></span>{group.name}</h4>
-                                        <button onClick={() => { setConfirmDialog({ show: true, message: `確定要刪除「${group.name}」這個分類群組嗎？`, onConfirm: () => { const newGroups = categoryGroups.filter((_, i) => i !== idx); handleSaveCategories(newGroups); }}); }} className="text-rose-400 text-xs font-bold hover:text-rose-300 bg-rose-950/30 px-3 py-1.5 rounded-lg border border-rose-900/50 transition-colors">刪除整個群組</button>
+            {/* PM Modals */}
+            {pmModalConfig.isOpen && (() => {
+                if (pmModalConfig.type === 'projectDetails') {
+                    const p = pmModalConfig.data;
+                    const pTasks = pmTasks.filter(t => t.project === p.id);
+                    const pInstructors = pmInstructors.filter(i => i.project === p.id);
+                    return (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 transition-opacity duration-300">
+                            <div className="bg-slate-900/95 border border-slate-700 rounded-3xl w-full max-w-4xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col transform transition-transform duration-300 scale-100">
+                                <div className="p-6 border-b border-slate-800/80 flex justify-between items-start bg-slate-800/50">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                    <StatusBadge status={p.status} />
+                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-900/50 px-2 py-0.5 rounded border border-slate-700">ID: {p.id}</span>
                                     </div>
-                                    <div className="space-y-3">
-                                        {(group.items||[]).map(cat => (
-                                            <div key={cat.id} className="flex justify-between items-center bg-slate-800/40 p-3 rounded-xl border border-slate-700/50 hover:bg-slate-800/60 transition-colors"><div className="flex items-center gap-3"><span className="text-sm font-bold text-slate-200">{cat.label}</span><span className="text-[10px] font-black tracking-widest text-slate-500 bg-slate-900/50 px-2 py-0.5 rounded-md">ID: {cat.id}</span></div><button onClick={() => { setConfirmDialog({ show: true, message: `確定要刪除「${cat.label}」嗎？`, onConfirm: () => { const newGroups = [...categoryGroups]; newGroups[idx].items = newGroups[idx].items.filter(c => c.id !== cat.id); handleSaveCategories(newGroups); }}); }} className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 p-2 rounded-lg transition-colors"><Icons.Trash /></button></div>
+                                    <h3 className="text-2xl font-black text-slate-100 tracking-tight">{p.name}</h3>
+                                </div>
+                                <button onClick={handleClosePmModal} className="p-2 text-slate-400 hover:text-slate-200 bg-slate-800/50 rounded-full transition-colors shadow-sm"><Icons.X /></button>
+                                </div>
+
+                                <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-slate-800/40 p-5 rounded-2xl border border-slate-700/50 shadow-sm space-y-4">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-700/50 pb-2">專案資訊</h4>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-500 font-medium">負責人 (PM)</span>
+                                        <span className="font-bold text-slate-200 flex items-center gap-1.5"><Icons.Users size={14} className="text-indigo-400"/> {p.pm}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-500 font-medium">專案區間</span>
+                                        <span className="font-bold text-slate-200 flex items-center gap-1.5"><Icons.CalendarDays size={14} className="text-indigo-400"/> {p.startDate} ~ {p.endDate}</span>
+                                    </div>
+                                    <div className="pt-2">
+                                        <div className="flex justify-between text-sm mb-1.5">
+                                        <span className="text-slate-500 font-medium">整體進度</span>
+                                        <span className="font-bold text-indigo-400">{p.progress}%</span>
+                                        </div>
+                                        <ProgressBar progress={p.progress} />
+                                    </div>
+                                    </div>
+
+                                    <div className="bg-slate-800/40 p-5 rounded-2xl border border-slate-700/50 shadow-sm space-y-3">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-700/50 pb-2">關聯線上文件</h4>
+                                    {p.docLinks && p.docLinks.length > 0 ? (
+                                        <div className="space-y-2">
+                                        {p.docLinks.map((link, idx) => (
+                                            <a key={idx} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 rounded-xl bg-blue-900/30 border border-blue-800/50 hover:bg-blue-800/50 transition-colors group">
+                                            <div className="flex items-center gap-2">
+                                                <Icons.FileText size={16} className="text-blue-400" />
+                                                <span className="text-sm font-bold text-blue-300">{link.title || '未命名連結'}</span>
+                                            </div>
+                                            <Icons.ExternalLink size={14} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </a>
                                         ))}
-                                        <div className="flex gap-3 mt-4"><input value={newCatForm.id} onChange={e=>setNewCatForm({...newCatForm, id:e.target.value})} placeholder="ID (純英數)" className="w-1/3 bg-slate-900/80 border border-slate-600 rounded-xl p-2.5 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 placeholder-slate-500" /><input value={newCatForm.label} onChange={e=>setNewCatForm({...newCatForm, label:e.target.value})} placeholder="分類名稱" className="flex-1 bg-slate-900/80 border border-slate-600 rounded-xl p-2.5 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 placeholder-slate-500" /><button onClick={() => { if(!newCatForm.id || !newCatForm.label) return; const newGroups = [...categoryGroups]; newGroups[idx].items.push({ id: newCatForm.id, label: newCatForm.label, type: 'frontline' }); handleSaveCategories(newGroups); setNewCatForm({ groupIdx: 0, label: '', id: '' }); }} className="bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold px-4 rounded-xl transition-colors shadow-sm">+</button></div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-slate-500 italic py-4 text-center">尚無綁定文件</div>
+                                    )}
                                     </div>
                                 </div>
-                            ))}
+
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                                    <Icons.KanbanSquare size={16} className="text-indigo-400"/> 任務與階段拆解 (共 {pTasks.length} 項)
+                                    </h4>
+                                    <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl overflow-hidden shadow-sm">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-900/50 border-b border-slate-700/50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">任務標題</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">狀態階段</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">負責人</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">期限</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700/50 text-sm text-slate-300">
+                                        {pTasks.length > 0 ? pTasks.map(t => (
+                                            <tr key={t.id} className="hover:bg-slate-800/60">
+                                            <td className="px-4 py-3 font-medium flex flex-col items-start gap-1">
+                                                <span className="font-bold text-slate-200">{t.title}</span>
+                                                {t.tags && t.tags.length > 0 && (
+                                                <div className="flex gap-1 mt-0.5">
+                                                    {t.tags.map(tag => <span key={tag} className="text-[10px] bg-amber-900/30 text-amber-400 border border-amber-700/50 px-1.5 rounded font-bold">{tag}</span>)}
+                                                </div>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                                            <td className="px-4 py-3 font-bold text-slate-400">{t.assignee}</td>
+                                            <td className="px-4 py-3 text-slate-500 font-medium">{t.endDate}</td>
+                                            </tr>
+                                        )) : <tr><td colSpan="4" className="text-center py-6 text-slate-500">目前無任何任務</td></tr>}
+                                        </tbody>
+                                    </table>
+                                    </div>
+                                </div>
+
+                                {pInstructors.length > 0 && (
+                                    <div>
+                                    <h4 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                                        <Icons.CalendarDays size={16} className="text-indigo-400"/> 講師與活動排程 (共 {pInstructors.length} 項)
+                                    </h4>
+                                    <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl overflow-hidden shadow-sm">
+                                        <table className="w-full text-left">
+                                        <thead className="bg-slate-900/50 border-b border-slate-700/50">
+                                            <tr>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">講師姓名</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">日期與時間</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">課堂數/課節名稱</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-slate-400">負責事項</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700/50 text-sm">
+                                            {pInstructors.map(i => (
+                                            <tr key={i.id} className="hover:bg-slate-800/60">
+                                                <td className="px-4 py-3 font-bold text-slate-200">{i.name}</td>
+                                                <td className="px-4 py-3 text-slate-300">{i.date} <span className="text-slate-500 ml-1 font-medium">{i.startTime}-{i.endTime}</span></td>
+                                                <td className="px-4 py-3">
+                                                    <div className="font-bold text-indigo-400 mb-1">{i.classCount || 1} 堂</div>
+                                                    <div className="flex flex-wrap gap-1 max-w-[180px]">
+                                                    {(Array.isArray(i.classNames) ? i.classNames : [i.classNames]).filter(Boolean).map((cname, idx) => (
+                                                        <span key={idx} className="bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-700 truncate max-w-full" title={cname}>
+                                                        {cname}
+                                                        </span>
+                                                    ))}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-400">{i.task}</td>
+                                            </tr>
+                                            ))}
+                                        </tbody>
+                                        </table>
+                                    </div>
+                                    </div>
+                                )}
+                                </div>
                             </div>
                         </div>
+                    );
+                }
+
+                const typeTitles = { projects: '專案', tasks: '課件/階段任務', instructors: '講師排程', team: '團隊成員' };
+                const actionTitle = pmModalConfig.isEdit ? '編輯' : '新增';
+
+                return (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 transition-opacity duration-300">
+                    <div className="bg-slate-900/95 border border-slate-700 rounded-3xl p-8 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto transform transition-transform duration-300 scale-100 custom-scrollbar">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-2xl font-black text-slate-100 tracking-tight">{actionTitle}{typeTitles[pmModalConfig.type]}</h3>
+                        <button onClick={handleClosePmModal} className="p-2 bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-full transition-colors"><Icons.X /></button>
                     </div>
-                </div>
-            )}
-            
-            {/* 工作類型管理 Modal */}
-            {showTaskTypeModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-xl p-8 border border-slate-700/50 max-h-[85vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6 shrink-0"><h3 className="text-2xl font-black text-slate-100 tracking-wide">管理工作類型標籤</h3><button onClick={() => setShowTaskTypeModal(false)} className="text-slate-400 hover:text-slate-200 bg-slate-800/50 p-2 rounded-full transition-colors"><Icons.X /></button></div>
-                        <div className="overflow-y-auto custom-scrollbar pr-4 flex-1 space-y-8">
-                            <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50">
-                                <h4 className="font-black text-slate-200 text-sm mb-4">新增自訂標籤</h4>
-                                <div className="grid grid-cols-2 gap-4 mb-4"><input value={newTaskForm.id} onChange={e=>setNewTaskForm({...newTaskForm, id:e.target.value})} placeholder="ID (如: meeting)" className="bg-slate-900/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 placeholder-slate-500" /><input value={newTaskForm.label} onChange={e=>setNewTaskForm({...newTaskForm, label:e.target.value})} placeholder="顯示名稱 (如: 會議)" className="bg-slate-900/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 placeholder-slate-500" /></div>
-                                <div className="grid grid-cols-2 gap-4 mb-5"><input value={newTaskForm.color} onChange={e=>setNewTaskForm({...newTaskForm, color:e.target.value})} placeholder="Tailwind 顏色類別 (如: bg-red-500 text-white)" className="bg-slate-900/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 text-[11px]" /><select value={newTaskForm.targetCategory} onChange={e=>setNewTaskForm({...newTaskForm, targetCategory:e.target.value})} className="bg-slate-900/80 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 cursor-pointer"><option value="">(排班時不連動人員轉移)</option>{categories.map(c => <option key={c.id} value={c.id}>自動轉移至 ➔ {c.label}</option>)}</select></div>
-                                <button onClick={() => { if(!newTaskForm.id || !newTaskForm.label) return; const newTypes = [...taskTypes, newTaskForm]; handleSaveTaskTypes(newTypes); setNewTaskForm({ id: '', label: '', color: 'bg-indigo-600 text-indigo-50', targetCategory: '' }); }} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-500 shadow-md active:scale-95">新增標籤</button>
+
+                    <form onSubmit={handlePmSubmit} className="space-y-5">
+                        
+                        {/* 全面翻修樣本套用按鈕 */}
+                        {pmModalConfig.type === 'tasks' && !pmModalConfig.isEdit && (
+                        <div className="mb-2 bg-amber-900/20 border border-amber-700/50 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                            <span className="text-sm font-bold text-amber-400">不知道從何開始？</span>
+                            <button 
+                            type="button"
+                            onClick={() => {
+                                setPmFormData(prev => ({
+                                ...prev,
+                                title: prev.title ? `${prev.title} (全面翻修)` : '【全面翻修】L1-A01',
+                                status: kanbanCols[0],
+                                tags: prev.tags ? prev.tags + ', 全面翻修, 核心任務' : '全面翻修, 核心任務',
+                                docLinks: [{ title: '素材審查表', url: 'https://shimo.im/sheets/m4kMMOVlm5cvMjkD/0qqka' }]
+                                }));
+                            }}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                            >
+                            <Icons.Sparkles /> 快速套用模板
+                            </button>
+                        </div>
+                        )}
+
+                        {pmModalConfig.type === 'projects' && (
+                        <>
+                            <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">專案名稱</label>
+                            <input required name="name" value={pmFormData.name || ''} placeholder="輸入專案名稱..." onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
                             </div>
                             <div>
-                                <h4 className="font-black text-slate-300 text-sm mb-4 flex items-center gap-2"><span className="w-1.5 h-4 bg-slate-500 rounded-full"></span>現有標籤清單</h4>
-                                <div className="space-y-3">
-                                    {(taskTypes||[]).map(task => (
-                                        <div key={task.id} className="flex justify-between items-center bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 hover:bg-slate-800/60 transition-colors"><div className="flex flex-col gap-2"><div className="flex items-center gap-3"><div className={`text-xs font-black px-3 py-1.5 rounded-lg shadow-sm border border-black/10 ${task.color}`}>{task.label}</div><span className="text-[10px] font-black tracking-widest text-slate-500 bg-slate-900/50 px-2 py-0.5 rounded-md">ID: {task.id}</span></div>{task.targetCategory && <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>排班時連動轉移 ➔ {categories.find(c=>c.id===task.targetCategory)?.label || task.targetCategory}</div>}</div><button onClick={() => { setConfirmDialog({ show: true, message: `確定要刪除「${task.label}」嗎？`, onConfirm: () => { const newTypes = taskTypes.filter(t => t.id !== task.id); handleSaveTaskTypes(newTypes); }}); }} className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 p-2.5 rounded-xl transition-colors"><Icons.Trash /></button></div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">專案進度 (%)</label>
+                            <input type="number" min="0" max="100" name="progress" value={pmFormData.progress || 0} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold" />
+                            </div>
+                            <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">專案負責人 (PM)</label>
+                            <select required name="pm" value={pmFormData.pm || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer">
+                                <option value="">請選擇</option>
+                                {pmTeam.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                            </select>
+                            </div>
+                            
+                            <div className="bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 border-dashed">
+                            <label className="flex items-center justify-between text-xs font-bold text-slate-400 mb-3">
+                                <span className="flex items-center gap-1"><Icons.LinkIcon /> 線上文件 / 審查表連結</span>
+                            </label>
+                            {(pmFormData.docLinks || []).map((link, idx) => (
+                                <div key={idx} className="flex gap-2 mb-2 relative group/link">
+                                <input placeholder="標題 (例: 審查表)" value={link.title} onChange={(e) => handlePmDocLinkChange(idx, 'title', e.target.value)} className="w-1/3 p-2 text-sm bg-slate-950/50 text-slate-200 border border-slate-600 rounded-lg focus:border-indigo-500 outline-none transition-all font-medium placeholder-slate-600" />
+                                <input placeholder="網址 (https://...)" value={link.url} onChange={(e) => handlePmDocLinkChange(idx, 'url', e.target.value)} className="flex-1 p-2 text-sm bg-slate-950/50 text-indigo-300 border border-slate-600 rounded-lg focus:border-indigo-500 outline-none transition-all placeholder-slate-600" />
+                                <button type="button" onClick={() => removePmDocLink(idx)} className="p-2 text-slate-500 hover:text-rose-400 bg-slate-900/50 rounded-lg transition-colors"><Icons.Trash /></button>
+                                </div>
+                            ))}
+                            <button type="button" onClick={addPmDocLink} className="mt-1 text-xs font-bold text-indigo-400 bg-indigo-900/30 border border-indigo-700/50 hover:bg-indigo-900/50 px-3 py-1.5 rounded-lg transition-colors">+ 新增連結欄位</button>
+                            </div>
+
+                            <div className="flex gap-4">
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">開始日期</label>
+                                <input required type="date" name="startDate" value={pmFormData.startDate || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer" />
+                            </div>
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">結束日期</label>
+                                <input required type="date" name="endDate" value={pmFormData.endDate || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer" />
+                            </div>
+                            </div>
+                        </>
+                        )}
+
+                        {pmModalConfig.type === 'tasks' && (
+                        <>
+                            <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">任務標題</label>
+                            <input required name="title" value={pmFormData.title || ''} placeholder="例: 整合上期迭代方向 / L1-A00 作業翻修" onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
+                            </div>
+                            <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">所屬專案</label>
+                            <select required name="project" value={pmFormData.project || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer">
+                                <option value="">請選擇</option>
+                                {pmProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            </div>
+                            <div className="flex gap-4">
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">負責人</label>
+                                <select required name="assignee" value={pmFormData.assignee || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer">
+                                <option value="">請選擇</option>
+                                {pmTeam.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-indigo-400 mb-1.5 ml-1">看板階段</label>
+                                <select required name="status" value={pmFormData.status || kanbanCols[0]} onChange={handlePmInputChange} className="w-full p-3 bg-indigo-900/30 border border-indigo-700/50 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all font-bold text-indigo-300 cursor-pointer">
+                                <option value="" disabled>選擇階段</option>
+                                {kanbanCols.map(col => <option key={col} value={col}>{col}</option>)}
+                                </select>
+                            </div>
+                            </div>
+                            <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">任務/階段標籤 (選填)</label>
+                            <input name="tags" value={pmFormData.tags || ''} placeholder="例：籌備A, 課研K (以逗號分隔)" onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
+                            </div>
+
+                            <div className="bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 border-dashed">
+                            <label className="flex items-center justify-between text-xs font-bold text-slate-400 mb-3">
+                                <span className="flex items-center gap-1"><Icons.LinkIcon /> 任務交付件 / 線上連結</span>
+                            </label>
+                            {(pmFormData.docLinks || []).map((link, idx) => (
+                                <div key={idx} className="flex gap-2 mb-2 relative">
+                                <input placeholder="標題" value={link.title} onChange={(e) => handlePmDocLinkChange(idx, 'title', e.target.value)} className="w-1/3 p-2 text-sm bg-slate-950/50 text-slate-200 border border-slate-600 rounded-lg focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
+                                <input placeholder="網址 (https://...)" value={link.url} onChange={(e) => handlePmDocLinkChange(idx, 'url', e.target.value)} className="flex-1 p-2 text-sm bg-slate-950/50 text-indigo-300 border border-slate-600 rounded-lg focus:border-indigo-500 outline-none transition-all placeholder-slate-600" />
+                                <button type="button" onClick={() => removePmDocLink(idx)} className="p-2 text-slate-500 hover:text-rose-400 bg-slate-900/50 rounded-lg transition-colors"><Icons.Trash /></button>
+                                </div>
+                            ))}
+                            <button type="button" onClick={addPmDocLink} className="mt-1 text-xs font-bold text-indigo-400 bg-indigo-900/30 border border-indigo-700/50 hover:bg-indigo-900/50 px-3 py-1.5 rounded-lg transition-colors">+ 新增連結欄位</button>
+                            </div>
+
+                            <div className="flex gap-4">
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">開始日期</label>
+                                <input required type="date" name="startDate" value={pmFormData.startDate || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer" />
+                            </div>
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">預計完成日</label>
+                                <input required type="date" name="endDate" value={pmFormData.endDate || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer" />
+                            </div>
+                            </div>
+                        </>
+                        )}
+
+                        {pmModalConfig.type === 'instructors' && (
+                        <>
+                            <input required name="name" value={pmFormData.name || ''} placeholder="講師姓名" onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
+                            <select required name="project" value={pmFormData.project || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer">
+                            <option value="">選擇主講專案</option>
+                            {pmProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            <div className="flex gap-4">
+                            <div className="w-1/2">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">授課日期</label>
+                                <input required type="date" name="date" value={pmFormData.date || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer" />
+                            </div>
+                            <div className="w-1/4">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">課堂數</label>
+                                <input required type="number" min="1" name="classCount" value={pmFormData.classCount || 1} onChange={(e) => {
+                                const count = parseInt(e.target.value) || 1;
+                                const newNames = [...(pmFormData.classNames || [])];
+                                setPmFormData(prev => ({ ...prev, classCount: count, classNames: newNames }));
+                                }} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold text-center" />
+                            </div>
+                            </div>
+                            
+                            <div className="bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 border-dashed">
+                                <label className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-3 ml-1">
+                                    <Icons.CalendarDays /> 各堂課節名稱
+                                </label>
+                                <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                                    {Array.from({ length: Math.max(1, parseInt(pmFormData.classCount) || 1) }).map((_, idx) => (
+                                    <input 
+                                        key={idx}
+                                        required
+                                        placeholder={`第 ${idx + 1} 堂名稱 (例: 構成正課 ${idx + 1})`} 
+                                        value={(pmFormData.classNames && pmFormData.classNames[idx]) || ''} 
+                                        onChange={(e) => {
+                                        const newNames = [...(pmFormData.classNames || [])];
+                                        newNames[idx] = e.target.value;
+                                        setPmFormData(prev => ({ ...prev, classNames: newNames }));
+                                        }} 
+                                        className="w-full p-2.5 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-all text-sm font-bold placeholder-slate-600" 
+                                    />
                                     ))}
                                 </div>
                             </div>
+
+                            <div className="flex gap-4">
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">開始時間</label>
+                                <input required type="time" name="startTime" value={pmFormData.startTime || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer" />
+                            </div>
+                            <div className="w-full">
+                                <label className="block text-xs font-bold text-slate-400 mb-1.5 ml-1">結束時間</label>
+                                <input required type="time" name="endTime" value={pmFormData.endTime || ''} onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold cursor-pointer" />
+                            </div>
+                            </div>
+                            <input required name="task" value={pmFormData.task || ''} placeholder="負責事項 (例: 正課直播授課、作業點評)" onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
+                        </>
+                        )}
+                        {pmModalConfig.type === 'team' && (
+                        <>
+                            <input required name="name" value={pmFormData.name || ''} placeholder="成員姓名" onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
+                            <input required name="role" value={pmFormData.role || ''} placeholder="職位/角色" onChange={handlePmInputChange} className="w-full p-3 bg-slate-950/50 border border-slate-600 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all font-bold placeholder-slate-600" />
+                        </>
+                        )}
+                        
+                        <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-800/80">
+                        <button type="button" onClick={handleClosePmModal} className="px-5 py-2.5 text-sm font-bold text-slate-300 bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors">取消</button>
+                        <button type="submit" className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 shadow-lg active:scale-95 transition-all">儲存內容</button>
+                        </div>
+                    </form>
+                    </div>
+                </div>
+                );
+            })()}
+
+            {/* 登入 Modal */}
+            {showAuthModal && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl p-8 w-full max-w-sm shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border border-slate-700/50">
+                        <div className="flex justify-center mb-4 text-indigo-400 scale-150"><Icons.Lock /></div>
+                        <h3 className="font-black text-xl text-center text-slate-100 mb-2 tracking-wide">管理員解鎖</h3>
+                        <p className="text-slate-400 text-xs text-center mb-6 font-medium">請輸入管理員密碼以啟用編輯功能<br/><span className="text-[10px] opacity-70">(預設為 admin，登入後可於左下角變更)</span></p>
+                        <input 
+                            type="password" 
+                            autoFocus
+                            value={authInput} 
+                            onChange={e => { setAuthInput(e.target.value); setAuthError(false); }} 
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    if (authInput === adminPassword) { setIsAdmin(true); setShowAuthModal(false); setAuthInput(''); setAuthError(false); }
+                                    else { setAuthError(true); }
+                                }
+                            }}
+                            className={`w-full bg-slate-950/50 border ${authError ? 'border-rose-500 ring-1 ring-rose-500/50' : 'border-slate-600'} rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 mb-2 text-center tracking-widest transition-all`} 
+                            placeholder="請輸入密碼..." 
+                        />
+                        <div className="h-6 mb-4 flex justify-center items-center">
+                            {authError && <span className="text-rose-400 text-xs font-bold animate-pulse">密碼錯誤，請重試！</span>}
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={() => { setShowAuthModal(false); setAuthInput(''); setAuthError(false); }} className="flex-1 py-3 rounded-xl font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all">取消</button>
+                            <button onClick={() => { 
+                                if (authInput === adminPassword) { setIsAdmin(true); setShowAuthModal(false); setAuthInput(''); setAuthError(false); }
+                                else { setAuthError(true); }
+                            }} className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg active:scale-95 transition-all">確認解鎖</button>
                         </div>
                     </div>
                 </div>
             )}
-         </div>
+
+            {/* 設定新密碼 Modal */}
+            {showPasswordModal && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl p-8 w-full max-w-sm shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border border-slate-700/50">
+                        <div className="flex justify-center mb-4 text-indigo-400 scale-150"><Icons.Key /></div>
+                        <h3 className="font-black text-xl text-center text-slate-100 mb-2 tracking-wide">變更管理員密碼</h3>
+                        <p className="text-slate-400 text-xs text-center mb-6 font-medium">請輸入您想設定的新密碼，此密碼將同步至雲端。</p>
+                        <input 
+                            type="text" 
+                            autoFocus
+                            value={newPasswordInput} 
+                            onChange={e => setNewPasswordInput(e.target.value)} 
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && newPasswordInput.trim()) {
+                                    setAdminPassword(newPasswordInput.trim());
+                                    saveData('adminPassword', newPasswordInput.trim());
+                                    setShowPasswordModal(false);
+                                    setNewPasswordInput('');
+                                }
+                            }}
+                            className="w-full bg-slate-950/50 border border-slate-600 rounded-xl p-3 text-sm font-bold text-slate-200 outline-none focus:border-indigo-500 mb-6 text-center tracking-widest transition-all" 
+                            placeholder="輸入新密碼..." 
+                        />
+                        <div className="flex gap-4">
+                            <button onClick={() => { setShowPasswordModal(false); setNewPasswordInput(''); }} className="flex-1 py-3 rounded-xl font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all">取消</button>
+                            <button onClick={() => { 
+                                if (newPasswordInput.trim()) {
+                                    setAdminPassword(newPasswordInput.trim());
+                                    saveData('adminPassword', newPasswordInput.trim());
+                                    setShowPasswordModal(false);
+                                    setNewPasswordInput('');
+                                }
+                            }} className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg active:scale-95 transition-all">儲存密碼</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            </div>
       );
     }
     
